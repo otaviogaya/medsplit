@@ -1,49 +1,41 @@
-# MedSplit (Expo + Supabase)
+# MedSplit (Web Responsivo + Supabase)
 
-App mobile (iOS/Android) para gestao de producao, faturamento, glosas e repasses de equipe de anestesia.
+Sistema web responsivo para gestao de producao, faturamento, glosas e repasses de equipe de anestesia.
 
 ## Stack
 
-- React Native com Expo (TypeScript)
-- Supabase (Postgres + Auth + RLS)
-- React Navigation
+- Next.js (App Router) + TypeScript + Tailwind
+- Supabase (Postgres + Auth + RLS + Storage)
+- TanStack Query
 - React Hook Form + Zod
-- TanStack Query com persistencia offline basica
-- UI com React Native Paper
 
 ## Estrutura
 
 ```txt
-src/
-  components/
-  features/
-    auth/
-    dashboard/
-    procedimentos/
-    repasses/
-    relatorios/
-    glosas/
-    cadastros/
-  lib/
-  navigation/
+web/
+  app/
+  src/
 supabase/
   migrations/
   seed.sql
+src/
+  ... (legado mobile Expo)
 ```
 
-## Setup local
+## Setup local (web)
 
 1. Instale dependencias:
 
 ```bash
 npm install
+npm --prefix web install
 ```
 
-2. Crie `.env` na raiz:
+2. Crie `web/.env.local`:
 
 ```env
-EXPO_PUBLIC_SUPABASE_URL=https://<project-ref>.supabase.co
-EXPO_PUBLIC_SUPABASE_ANON_KEY=<anon-key>
+NEXT_PUBLIC_SUPABASE_URL=https://<project-ref>.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=<anon-key>
 ```
 
 3. Rode as migrations e seed no Supabase (na ordem):
@@ -57,12 +49,12 @@ EXPO_PUBLIC_SUPABASE_ANON_KEY=<anon-key>
 - Execute `supabase/migrations/202603060110_pagamento_procedimento.sql`
 - Execute `supabase/migrations/202603060150_forma_pagamento.sql`
 - Execute `supabase/migrations/202603060200_valor_calculado_editavel.sql`
- - Execute `supabase/seed.sql`
+- Execute `supabase/seed.sql`
 
-4. Inicie o app:
+4. Inicie o site:
 
 ```bash
-npm run start
+npm run dev
 ```
 
 ## Auth, roles e RLS
@@ -118,11 +110,12 @@ RLS implementado nas tabelas:
 ## Storage de documentos
 
 - Bucket usado: `procedimentos-documentos`
-- Upload feito no app ao salvar procedimento com foto tirada na camera
+- Upload feito no site ao salvar procedimento com arquivo de imagem
 - URL publica salva em `procedimentos.documento_foto_url`
 
-## Observacoes de deploy
+## Deploy web
 
-- Build mobile: EAS Build (`eas build -p android` / `eas build -p ios`)
-- Backend: Supabase gerenciado (migrations versionadas no repo)
+- Build: `npm run build`
+- Start: `npm run start`
+- Recomendado: Vercel (ou qualquer host Node compatível com Next.js)
 - Garantir que cada medico logado esteja vinculado a `anestesistas.user_id` para RLS funcionar.
