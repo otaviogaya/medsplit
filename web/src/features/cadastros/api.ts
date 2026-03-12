@@ -1,6 +1,12 @@
 import { supabase } from "@/src/lib/supabase";
 import { CadastroItem } from "@/src/types/app";
 
+async function getCurrentEquipeId(): Promise<string | null> {
+  const { data, error } = await supabase.rpc("fn_current_equipe_id");
+  if (error) return null;
+  return data as string | null;
+}
+
 export async function listHospitais() {
   const { data, error } = await supabase.from("hospitais").select("id,nome").order("nome");
   if (error) throw error;
@@ -35,9 +41,10 @@ export async function getOrCreateConvenioByNome(nome: string) {
   if (selectError) throw selectError;
   if (existing) return existing;
 
+  const equipeId = await getCurrentEquipeId();
   const { data: created, error: insertError } = await supabase
     .from("convenios")
-    .insert({ nome: normalized })
+    .insert({ nome: normalized, equipe_id: equipeId })
     .select("id,nome")
     .single();
   if (insertError) throw insertError;
@@ -54,9 +61,10 @@ export async function getOrCreateCirurgiaoByNome(nome: string) {
   if (selectError) throw selectError;
   if (existing) return existing;
 
+  const equipeId = await getCurrentEquipeId();
   const { data: created, error: insertError } = await supabase
     .from("cirurgioes")
-    .insert({ nome: normalized })
+    .insert({ nome: normalized, equipe_id: equipeId })
     .select("id,nome")
     .single();
   if (insertError) throw insertError;
@@ -78,13 +86,16 @@ export async function createHospital(payload: {
   cidade: string;
   contato_faturamento?: string;
   prazo_pagamento_dias?: number;
+  equipe_id?: string | null;
 }) {
-  const { error } = await supabase.from("hospitais").insert(payload);
+  const equipeId = payload.equipe_id ?? (await getCurrentEquipeId());
+  const { error } = await supabase.from("hospitais").insert({ ...payload, equipe_id: equipeId });
   if (error) throw error;
 }
 
-export async function createConvenio(payload: { nome: string }) {
-  const { error } = await supabase.from("convenios").insert(payload);
+export async function createConvenio(payload: { nome: string; equipe_id?: string | null }) {
+  const equipeId = payload.equipe_id ?? (await getCurrentEquipeId());
+  const { error } = await supabase.from("convenios").insert({ ...payload, equipe_id: equipeId });
   if (error) throw error;
 }
 
@@ -94,8 +105,10 @@ export async function createAnestesista(payload: {
   percentual_padrao_auxiliar?: number;
   pix?: string | null;
   banco?: string | null;
+  equipe_id?: string | null;
 }) {
-  const { error } = await supabase.from("anestesistas").insert(payload);
+  const equipeId = payload.equipe_id ?? (await getCurrentEquipeId());
+  const { error } = await supabase.from("anestesistas").insert({ ...payload, equipe_id: equipeId });
   if (error) throw error;
 }
 

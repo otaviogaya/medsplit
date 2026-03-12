@@ -22,31 +22,42 @@ import {
 } from "@/src/features/procedimentos/api";
 import { todayIsoDate } from "@/src/lib/format";
 import { getErrorMessage } from "@/src/lib/error";
+import { BackLink } from "@/src/components/back-link";
+import { useToast } from "@/src/components/toast";
 
 const schema = z.object({
-  data_procedimento: z.string().min(10),
-  hospital_id: z.string().uuid(),
-  paciente_nome: z.string().min(2),
+  data_procedimento: z.string().min(10, "Informe a data"),
+  hospital_id: z.string().uuid("Selecione um hospital"),
+  paciente_nome: z.string().min(2, "Nome do paciente obrigatório"),
   cirurgiao_id: z.string().optional(),
   cirurgiao_nome_manual: z.string().optional(),
-  descricao_procedimento: z.string().min(2),
+  descricao_procedimento: z.string().min(2, "Descrição obrigatória"),
   convenio_id: z.string().optional(),
   convenio_nome_manual: z.string().optional(),
-  anestesista_principal_id: z.string().uuid(),
+  anestesista_principal_id: z.string().uuid("Selecione um anestesista"),
   observacoes: z.string().optional(),
 });
 
 type FormData = z.infer<typeof schema>;
 
+const inputClass = "rounded-lg border border-slate-300 px-3 py-2.5 text-sm transition";
+const inputErrorClass = "rounded-lg border border-red-400 bg-red-50 px-3 py-2.5 text-sm transition";
+
 export default function NovoProcedimentoPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const { session } = useAuth();
+  const toast = useToast();
   const [uploadFile, setUploadFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  const form = useForm<FormData>({
+  const {
+    register,
+    handleSubmit,
+    setValue,
+    formState: { errors },
+  } = useForm<FormData>({
     resolver: zodResolver(schema),
     defaultValues: {
       data_procedimento: todayIsoDate(),
@@ -70,11 +81,11 @@ export default function NovoProcedimentoPage() {
 
   useEffect(() => {
     if (anestesistaAtual?.id) {
-      form.setValue("anestesista_principal_id", anestesistaAtual.id);
+      setValue("anestesista_principal_id", anestesistaAtual.id);
     }
-  }, [anestesistaAtual?.id, form]);
+  }, [anestesistaAtual?.id, setValue]);
 
-  const onSubmit = form.handleSubmit(async (values) => {
+  const onSubmit = handleSubmit(async (values) => {
     try {
       setLoading(true);
       setError("");
@@ -85,7 +96,7 @@ export default function NovoProcedimentoPage() {
         const convenio = await getOrCreateConvenioByNome(values.convenio_nome_manual);
         convenioIdFinal = convenio.id;
       }
-      if (!convenioIdFinal) throw new Error("Selecione um convenio ou digite um novo.");
+      if (!convenioIdFinal) throw new Error("Selecione um convênio ou digite um novo.");
 
       if (values.cirurgiao_id) {
         const cirurgiaoDaLista = cirurgioes.find((item) => item.id === values.cirurgiao_id);
@@ -94,7 +105,7 @@ export default function NovoProcedimentoPage() {
         const cirurgiao = await getOrCreateCirurgiaoByNome(values.cirurgiao_nome_manual);
         cirurgiaoNomeFinal = cirurgiao.nome;
       }
-      if (!cirurgiaoNomeFinal) throw new Error("Selecione um cirurgiao ou digite um novo.");
+      if (!cirurgiaoNomeFinal) throw new Error("Selecione um cirurgião ou digite um novo.");
 
       let documentoUrlFinal: string | null = null;
       if (uploadFile) {
@@ -114,6 +125,7 @@ export default function NovoProcedimentoPage() {
         documento_foto_url: documentoUrlFinal,
       });
       await queryClient.invalidateQueries({ queryKey: ["procedimentos"] });
+      toast("Procedimento criado com sucesso!");
       router.push("/procedimentos");
     } catch (err: unknown) {
       setError(getErrorMessage(err));
@@ -123,89 +135,132 @@ export default function NovoProcedimentoPage() {
   });
 
   return (
-    <form className="grid max-w-3xl gap-3 rounded-xl border border-slate-200 bg-white p-5 shadow-sm" onSubmit={onSubmit}>
-      <h1 className="text-xl font-semibold text-slate-900">Novo procedimento</h1>
-      <div className="grid gap-3 md:grid-cols-2">
+    <div className="grid gap-4">
+      <BackLink href="/procedimentos" label="Voltar para lista" />
+
+      <form className="grid max-w-3xl gap-4 rounded-xl border border-slate-200 bg-white p-6 shadow-sm" onSubmit={onSubmit}>
+        <h1 className="text-xl font-semibold text-slate-900">Novo procedimento</h1>
+
+        <div className="grid gap-4 sm:grid-cols-2">
+          <label className="grid gap-1 text-sm">
+            <span className="font-medium text-slate-700">Data do procedimento</span>
+            <input className={errors.data_procedimento ? inputErrorClass : inputClass} type="date" {...register("data_procedimento")} />
+            {errors.data_procedimento && <span className="text-xs text-red-600">{errors.data_procedimento.message}</span>}
+          </label>
+          <label className="grid gap-1 text-sm">
+            <span className="font-medium text-slate-700">Hospital</span>
+            <select className={errors.hospital_id ? inputErrorClass : inputClass} {...register("hospital_id")}>
+              <option value="">Selecione...</option>
+              {hospitais.map((item) => (
+                <option key={item.id} value={item.id}>{item.nome}</option>
+              ))}
+            </select>
+            {errors.hospital_id && <span className="text-xs text-red-600">{errors.hospital_id.message}</span>}
+          </label>
+        </div>
+
         <label className="grid gap-1 text-sm">
-          <span>Data do procedimento</span>
-          <input className="rounded border border-slate-300 px-3 py-2" type="date" {...form.register("data_procedimento")} />
+          <span className="font-medium text-slate-700">Paciente</span>
+          <input className={errors.paciente_nome ? inputErrorClass : inputClass} placeholder="Nome completo do paciente" {...register("paciente_nome")} />
+          {errors.paciente_nome && <span className="text-xs text-red-600">{errors.paciente_nome.message}</span>}
         </label>
+
+        <div className="grid gap-4 sm:grid-cols-2">
+          <label className="grid gap-1 text-sm">
+            <span className="font-medium text-slate-700">Cirurgião (lista)</span>
+            <select className={inputClass} {...register("cirurgiao_id")}>
+              <option value="">Selecione...</option>
+              {cirurgioes.map((item) => (
+                <option key={item.id} value={item.id}>{item.nome}</option>
+              ))}
+            </select>
+          </label>
+          <label className="grid gap-1 text-sm">
+            <span className="font-medium text-slate-700">Ou digite cirurgião novo</span>
+            <input className={inputClass} placeholder="Nome do cirurgião" {...register("cirurgiao_nome_manual")} />
+          </label>
+        </div>
+
         <label className="grid gap-1 text-sm">
-          <span>Hospital</span>
-          <select className="rounded border border-slate-300 px-3 py-2" {...form.register("hospital_id")}>
-            <option value="">Selecione</option>
-            {hospitais.map((item) => (
+          <span className="font-medium text-slate-700">Procedimento</span>
+          <input className={errors.descricao_procedimento ? inputErrorClass : inputClass} placeholder="Descrição do procedimento" {...register("descricao_procedimento")} />
+          {errors.descricao_procedimento && <span className="text-xs text-red-600">{errors.descricao_procedimento.message}</span>}
+        </label>
+
+        <div className="grid gap-4 sm:grid-cols-2">
+          <label className="grid gap-1 text-sm">
+            <span className="font-medium text-slate-700">Convênio</span>
+            <select className={inputClass} {...register("convenio_id")}>
+              <option value="">Selecione...</option>
+              {convenios.map((item) => (
+                <option key={item.id} value={item.id}>{item.nome}</option>
+              ))}
+            </select>
+          </label>
+          <label className="grid gap-1 text-sm">
+            <span className="font-medium text-slate-700">Ou digite convênio novo</span>
+            <input className={inputClass} placeholder="Nome do convênio" {...register("convenio_nome_manual")} />
+          </label>
+        </div>
+
+        <label className="grid gap-1 text-sm">
+          <span className="font-medium text-slate-700">Anestesista</span>
+          <select className={errors.anestesista_principal_id ? inputErrorClass : inputClass} {...register("anestesista_principal_id")}>
+            <option value="">Selecione...</option>
+            {anestesistas.map((item) => (
               <option key={item.id} value={item.id}>{item.nome}</option>
             ))}
           </select>
+          {errors.anestesista_principal_id && <span className="text-xs text-red-600">{errors.anestesista_principal_id.message}</span>}
         </label>
-      </div>
 
-      <label className="grid gap-1 text-sm">
-        <span>Paciente</span>
-        <input className="rounded border border-slate-300 px-3 py-2" {...form.register("paciente_nome")} />
-      </label>
-      <label className="grid gap-1 text-sm">
-        <span>Cirurgiao (lista)</span>
-        <select className="rounded border border-slate-300 px-3 py-2" {...form.register("cirurgiao_id")}>
-          <option value="">Selecione</option>
-          {cirurgioes.map((item) => (
-            <option key={item.id} value={item.id}>{item.nome}</option>
-          ))}
-        </select>
-      </label>
-      <label className="grid gap-1 text-sm">
-        <span>Ou digite cirurgiao novo</span>
-        <input className="rounded border border-slate-300 px-3 py-2" {...form.register("cirurgiao_nome_manual")} />
-      </label>
-      <label className="grid gap-1 text-sm">
-        <span>Procedimento</span>
-        <input className="rounded border border-slate-300 px-3 py-2" {...form.register("descricao_procedimento")} />
-      </label>
-      <label className="grid gap-1 text-sm">
-        <span>Convenio</span>
-        <select className="rounded border border-slate-300 px-3 py-2" {...form.register("convenio_id")}>
-          <option value="">Selecione</option>
-          {convenios.map((item) => (
-            <option key={item.id} value={item.id}>{item.nome}</option>
-          ))}
-        </select>
-      </label>
-      <label className="grid gap-1 text-sm">
-        <span>Ou digite convenio novo</span>
-        <input className="rounded border border-slate-300 px-3 py-2" {...form.register("convenio_nome_manual")} />
-      </label>
-      <label className="grid gap-1 text-sm">
-        <span>Anestesista</span>
-        <select className="rounded border border-slate-300 px-3 py-2" {...form.register("anestesista_principal_id")}>
-          <option value="">Selecione</option>
-          {anestesistas.map((item) => (
-            <option key={item.id} value={item.id}>{item.nome}</option>
-          ))}
-        </select>
-      </label>
-      <label className="grid gap-1 text-sm">
-        <span>Observacoes</span>
-        <textarea className="rounded border border-slate-300 px-3 py-2" rows={3} {...form.register("observacoes")} />
-      </label>
-      <label className="grid gap-1 text-sm">
-        <span>Documento (imagem)</span>
-        <input
-          accept="image/*"
-          className="rounded border border-slate-300 px-3 py-2"
-          type="file"
-          onChange={(e) => setUploadFile(e.target.files?.[0] ?? null)}
-        />
-      </label>
+        <label className="grid gap-1 text-sm">
+          <span className="font-medium text-slate-700">Observações</span>
+          <textarea className={inputClass} placeholder="Observações opcionais..." rows={3} {...register("observacoes")} />
+        </label>
 
-      {error ? <p className="text-sm text-red-600">{error}</p> : null}
-      <button
-        className="rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-60"
-        disabled={loading}
-        type="submit"
-      >
-        {loading ? "Salvando..." : "Salvar procedimento"}
-      </button>
-    </form>
+        <div className="grid gap-2">
+          <span className="text-sm font-medium text-slate-700">Documento (imagem)</span>
+          <div className="grid gap-2 sm:grid-cols-2">
+            <label className="flex cursor-pointer flex-col items-center gap-2 rounded-lg border-2 border-dashed border-slate-300 px-4 py-4 text-center transition hover:border-blue-400 hover:bg-blue-50">
+              <span className="text-2xl">📁</span>
+              <span className="text-sm text-slate-600">Escolher arquivo</span>
+              <input
+                accept="image/*"
+                className="hidden"
+                type="file"
+                onChange={(e) => setUploadFile(e.target.files?.[0] ?? null)}
+              />
+            </label>
+            <label className="flex cursor-pointer flex-col items-center gap-2 rounded-lg border-2 border-dashed border-slate-300 px-4 py-4 text-center transition hover:border-blue-400 hover:bg-blue-50">
+              <span className="text-2xl">📷</span>
+              <span className="text-sm text-slate-600">Tirar foto</span>
+              <input
+                accept="image/*"
+                capture="environment"
+                className="hidden"
+                type="file"
+                onChange={(e) => setUploadFile(e.target.files?.[0] ?? null)}
+              />
+            </label>
+          </div>
+          {uploadFile ? (
+            <p className="text-xs text-green-700">Arquivo selecionado: {uploadFile.name}</p>
+          ) : null}
+        </div>
+
+        {error ? (
+          <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div>
+        ) : null}
+
+        <button
+          className="rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:opacity-60"
+          disabled={loading}
+          type="submit"
+        >
+          {loading ? "Salvando..." : "Salvar procedimento"}
+        </button>
+      </form>
+    </div>
   );
 }

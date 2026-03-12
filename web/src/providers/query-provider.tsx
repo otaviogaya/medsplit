@@ -11,7 +11,10 @@ export function QueryProvider({ children }: PropsWithChildren) {
           queries: {
             staleTime: 1000 * 60,
             gcTime: 1000 * 60 * 60,
-            retry: 2,
+            retry: (failureCount, error) => {
+              if (error instanceof Error && error.name === "AbortError") return failureCount < 2;
+              return false;
+            },
           },
           mutations: {
             retry: 1,

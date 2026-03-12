@@ -1,4 +1,4 @@
-export type UserRole = "admin" | "medico" | "faturamento";
+export type UserRole = "admin" | "medico" | "faturamento" | "superadmin";
 
 export type ProcedimentoStatus =
   | "realizado"

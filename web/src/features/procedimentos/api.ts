@@ -54,7 +54,7 @@ type UpdateStatusInput = {
 };
 
 export async function updateStatusProcedimento(input: UpdateStatusInput) {
-  const { data, error } = await supabase.rpc("update_status_procedimento", {
+  const payloadWithForma = {
     p_id: input.id,
     p_status: input.status,
     p_data_faturamento: input.data_faturamento ?? null,
@@ -62,6 +62,26 @@ export async function updateStatusProcedimento(input: UpdateStatusInput) {
     p_valor_recebido: input.valor_recebido ?? null,
     p_observacoes: input.observacoes ?? null,
     p_forma_pagamento: input.forma_pagamento ?? null,
+  };
+
+  const firstTry = await supabase.rpc("update_status_procedimento", payloadWithForma);
+  if (!firstTry.error) return firstTry.data;
+
+  const errorMessage = firstTry.error.message ?? "";
+  const missingFormaParam =
+    errorMessage.includes("update_status_procedimento") &&
+    errorMessage.includes("p_forma_pagamento");
+
+  if (!missingFormaParam) throw firstTry.error;
+
+  // Backward compatibility: older DB function signature without p_forma_pagamento.
+  const { data, error } = await supabase.rpc("update_status_procedimento", {
+    p_id: input.id,
+    p_status: input.status,
+    p_data_faturamento: input.data_faturamento ?? null,
+    p_data_recebimento: input.data_recebimento ?? null,
+    p_valor_recebido: input.valor_recebido ?? null,
+    p_observacoes: input.observacoes ?? null,
   });
   if (error) throw error;
   return data;
