@@ -256,39 +256,6 @@ export default function NovoProcedimentoPage() {
         <div className="grid gap-2 text-sm" ref={cbhpmRef}>
           <span className="font-medium text-slate-700">Procedimentos (CBHPM)</span>
 
-          {cbhpmList.length > 0 && (
-            <div className="grid gap-2">
-              {cbhpmList.map((item) => (
-                <div
-                  key={item.codigo}
-                  className="flex items-center justify-between gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2"
-                >
-                  <div className="min-w-0">
-                    <p className="text-sm text-slate-800">{item.descricao}</p>
-                    <p className="flex flex-wrap gap-3 text-xs text-slate-500">
-                      <span>
-                        Código: <span className="font-mono font-semibold text-blue-700">{item.codigo}</span>
-                      </span>
-                      {item.porte_anestesico && (
-                        <span>
-                          Porte Anestésico: <span className="font-semibold text-slate-800">{item.porte_anestesico}</span>
-                        </span>
-                      )}
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    className="shrink-0 rounded p-1 text-slate-400 transition-colors hover:bg-red-100 hover:text-red-600"
-                    onClick={() => removeCbhpmItem(item.codigo)}
-                    title="Remover"
-                  >
-                    &times;
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
-
           <div className="relative">
             <input
               className={cbhpmError ? inputErrorClass + " w-full" : inputClass + " w-full"}
@@ -346,10 +313,44 @@ export default function NovoProcedimentoPage() {
           {cbhpmError && <span className="text-xs text-red-600">{cbhpmError}</span>}
 
           {cbhpmList.length > 0 && (
-            <p className="text-xs text-slate-400">
-              {cbhpmList.length} procedimento{cbhpmList.length > 1 ? "s" : ""} selecionado{cbhpmList.length > 1 ? "s" : ""}
-              {" — "}Porte Anestésico máximo: <span className="font-semibold">{buildCbhpmPayload(cbhpmList).porteAnestesico}</span>
-            </p>
+            <div className="grid gap-2 rounded-lg border border-slate-200 bg-slate-50 p-3">
+              <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
+                {cbhpmList.length} procedimento{cbhpmList.length > 1 ? "s" : ""} selecionado{cbhpmList.length > 1 ? "s" : ""}
+              </p>
+              {cbhpmList.map((item, idx) => (
+                <div
+                  key={item.codigo}
+                  className="flex items-start justify-between gap-3 rounded-lg border border-blue-200 bg-white px-3 py-2.5"
+                >
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium text-slate-800">
+                      <span className="mr-1.5 text-slate-400">{idx + 1}.</span>
+                      {item.descricao}
+                    </p>
+                    <p className="mt-0.5 flex flex-wrap gap-3 text-xs text-slate-500">
+                      <span>
+                        Código: <span className="font-mono font-semibold text-blue-700">{item.codigo}</span>
+                      </span>
+                      {item.porte_anestesico && (
+                        <span>
+                          Porte Anestésico: <span className="font-semibold text-slate-800">{item.porte_anestesico}</span>
+                        </span>
+                      )}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    className="shrink-0 rounded-md border border-red-200 bg-red-50 px-2 py-1 text-xs font-medium text-red-600 transition-colors hover:bg-red-100"
+                    onClick={() => removeCbhpmItem(item.codigo)}
+                  >
+                    Excluir
+                  </button>
+                </div>
+              ))}
+              <p className="text-xs text-slate-400">
+                Porte Anestésico máximo: <span className="font-semibold text-slate-700">{buildCbhpmPayload(cbhpmList).porteAnestesico}</span>
+              </p>
+            </div>
           )}
         </div>
 
