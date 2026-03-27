@@ -16,7 +16,7 @@ import {
   Legend,
   CartesianGrid,
 } from "recharts";
-import { getDashboardChartData, getKpisMesAtual } from "@/src/features/dashboard/api";
+import { getDashboardData } from "@/src/features/dashboard/api";
 import { toMoney } from "@/src/lib/format";
 import { QueryError } from "@/src/components/query-error";
 
@@ -56,24 +56,22 @@ function formatCurrency(value: number) {
 }
 
 export default function DashboardPage() {
-  const { data: kpis, isLoading: loadingKpis, isError: kpisError, error: kpisErr, refetch: refetchKpis } = useQuery({
-    queryKey: ["kpis-mes-atual"],
-    queryFn: getKpisMesAtual,
-  });
-
-  const { data: charts, isLoading: loadingCharts, isError: chartsError, error: chartsErr, refetch: refetchCharts } = useQuery({
-    queryKey: ["dashboard-charts"],
-    queryFn: getDashboardChartData,
+  const { data, isLoading, isError, error, refetch } = useQuery({
+    queryKey: ["dashboard"],
+    queryFn: getDashboardData,
     staleTime: 1000 * 60 * 5,
   });
+
+  const kpis = data?.kpis;
+  const charts = data?.charts;
 
   return (
     <div className="grid gap-6">
       <h1 className="text-xl font-semibold text-slate-900">Dashboard</h1>
 
-      {kpisError ? <QueryError error={kpisErr} onRetry={() => refetchKpis()} /> : null}
+      {isError ? <QueryError error={error} onRetry={() => refetch()} /> : null}
 
-      {loadingKpis && !kpisError ? (
+      {isLoading && !isError ? (
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
           {Array.from({ length: 5 }).map((_, i) => (
             <KpiSkeleton key={i} />
@@ -89,9 +87,7 @@ export default function DashboardPage() {
         </div>
       ) : null}
 
-      {chartsError ? <QueryError error={chartsErr} onRetry={() => refetchCharts()} /> : null}
-
-      {loadingCharts && !chartsError ? (
+      {isLoading && !isError ? (
         <div className="grid gap-4 lg:grid-cols-2">
           {Array.from({ length: 4 }).map((_, i) => (
             <ChartSkeleton key={i} />

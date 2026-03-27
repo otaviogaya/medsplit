@@ -2,63 +2,44 @@ import dayjs from "dayjs";
 import { listProcedimentos } from "@/src/features/procedimentos/api";
 import { ProcedimentoRow } from "@/src/types/rows";
 
-export async function getKpisMesAtual() {
-  const mes = dayjs().format("YYYY-MM");
-  const procedimentos = (await listProcedimentos({ mes })) as ProcedimentoRow[];
-
-  const faturado = procedimentos.reduce(
-    (acc: number, item) => acc + Number(item.valor_calculado ?? 0),
-    0,
-  );
-  const recebido = procedimentos.reduce(
-    (acc: number, item) => acc + Number(item.valor_recebido ?? 0),
-    0,
-  );
-  const glosado = procedimentos.reduce((acc: number, item) => {
-    const valorCalculado = Number(item.valor_calculado ?? 0);
-    const valorRecebido = Number(item.valor_recebido ?? 0);
-    return acc + Math.max(valorCalculado - valorRecebido, 0);
-  }, 0);
-
-  return {
-    cirurgiasMes: procedimentos.length,
-    faturado,
-    recebido,
-    glosado,
-    aReceber: faturado - recebido,
-  };
-}
-
-export async function getDashboardChartData() {
+export async function getDashboardData() {
   const meses: string[] = [];
   for (let i = 5; i >= 0; i--) {
     meses.push(dayjs().subtract(i, "month").format("YYYY-MM"));
   }
 
-  const todosProcedimentos: ProcedimentoRow[] = [];
-  for (const mes of meses) {
-    const procs = (await listProcedimentos({ mes })) as ProcedimentoRow[];
-    todosProcedimentos.push(...procs);
-  }
+  const results = await Promise.all(
+    meses.map((mes) => listProcedimentos({ mes }) as Promise<ProcedimentoRow[]>),
+  );
 
-  const evolucaoMensal = meses.map((mes) => {
-    const procsDoMes = todosProcedimentos.filter(
-      (p) => dayjs(p.data_procedimento).format("YYYY-MM") === mes,
-    );
-    const faturado = procsDoMes.reduce((acc, p) => acc + Number(p.valor_calculado ?? 0), 0);
-    const recebido = procsDoMes.reduce((acc, p) => acc + Number(p.valor_recebido ?? 0), 0);
+  const todosProcedimentos = results.flat();
+  const mesAtual = meses[meses.length - 1];
+  const procsMesAtual = results[results.length - 1];
+
+  const faturado = procsMesAtual.reduce((acc, p) => acc + Number(p.valor_calculado ?? 0), 0);
+  const recebido = procsMesAtual.reduce((acc, p) => acc + Number(p.valor_recebido ?? 0), 0);
+
+  const kpis = {
+    cirurgiasMes: procsMesAtual.length,
+    faturado,
+    recebido,
+    glosado: procsMesAtual.reduce((acc, p) => {
+      return acc + Math.max(Number(p.valor_calculado ?? 0) - Number(p.valor_recebido ?? 0), 0);
+    }, 0),
+    aReceber: faturado - recebido,
+  };
+
+  const evolucaoMensal = meses.map((mes, i) => {
+    const procsDoMes = results[i];
+    const fat = procsDoMes.reduce((acc, p) => acc + Number(p.valor_calculado ?? 0), 0);
+    const rec = procsDoMes.reduce((acc, p) => acc + Number(p.valor_recebido ?? 0), 0);
     return {
       mes: dayjs(mes + "-01").format("MMM/YY"),
       procedimentos: procsDoMes.length,
-      faturado,
-      recebido,
+      faturado: fat,
+      recebido: rec,
     };
   });
-
-  const mesAtual = dayjs().format("YYYY-MM");
-  const procsMesAtual = todosProcedimentos.filter(
-    (p) => dayjs(p.data_procedimento).format("YYYY-MM") === mesAtual,
-  );
 
   const porHospitalMap = new Map<string, number>();
   procsMesAtual.forEach((p) => {
@@ -85,5 +66,5 @@ export async function getDashboardChartData() {
     .map(([nome, quantidade]) => ({ nome, quantidade }))
     .sort((a, b) => b.quantidade - a.quantidade);
 
-  return { evolucaoMensal, porHospital, statusPagamento, porConvenio };
+  return { kpis, charts: { evolucaoMensal, porHospital, statusPagamento, porConvenio } };
 }

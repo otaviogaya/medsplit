@@ -9,8 +9,9 @@ export function QueryProvider({ children }: PropsWithChildren) {
       new QueryClient({
         defaultOptions: {
           queries: {
-            staleTime: 1000 * 60,
+            staleTime: 1000 * 60 * 2,
             gcTime: 1000 * 60 * 60,
+            refetchOnWindowFocus: false,
             retry: (failureCount, error) => {
               if (error instanceof Error && error.name === "AbortError") return failureCount < 2;
               return false;

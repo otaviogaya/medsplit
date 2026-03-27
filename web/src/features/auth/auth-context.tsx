@@ -33,28 +33,32 @@ export function AuthProvider({ children }: PropsWithChildren) {
   const [loading, setLoading] = useState(!supabaseConfigError);
 
   useEffect(() => {
-    if (supabaseConfigError) {
-      return;
-    }
+    if (supabaseConfigError) return;
+
+    let profileLoadedForUser: string | null = null;
 
     async function loadProfile(userId: string) {
+      if (profileLoadedForUser === userId) return;
+      profileLoadedForUser = userId;
+
       const { data: profile } = await supabase
         .from("users_profile")
         .select("role, equipe_id")
         .eq("id", userId)
         .maybeSingle();
 
-      setRole((profile?.role as UserRole | undefined) ?? null);
+      const userRole = (profile?.role as UserRole | undefined) ?? null;
       const eqId = profile?.equipe_id as string | null;
+      setRole(userRole);
       setEquipeId(eqId);
 
       if (eqId) {
-        const { data: equipe } = await supabase
+        supabase
           .from("equipes")
           .select("nome")
           .eq("id", eqId)
-          .maybeSingle();
-        setEquipeNome(equipe?.nome ?? null);
+          .maybeSingle()
+          .then(({ data: equipe }) => setEquipeNome(equipe?.nome ?? null));
       } else {
         setEquipeNome(null);
       }
@@ -71,11 +75,12 @@ export function AuthProvider({ children }: PropsWithChildren) {
 
     loadInitialSession();
 
-    const { data } = supabase.auth.onAuthStateChange(async (_event, currentSession) => {
+    const { data } = supabase.auth.onAuthStateChange((_event, currentSession) => {
       setSession(currentSession);
       if (currentSession?.user.id) {
-        await loadProfile(currentSession.user.id);
+        loadProfile(currentSession.user.id);
       } else {
+        profileLoadedForUser = null;
         setRole(null);
         setEquipeId(null);
         setEquipeNome(null);
