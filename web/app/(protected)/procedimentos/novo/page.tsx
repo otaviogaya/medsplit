@@ -35,9 +35,6 @@ const schema = z.object({
   paciente_nome: z.string().min(2, "Nome do paciente obrigatório"),
   cirurgiao_id: z.string().optional(),
   cirurgiao_nome_manual: z.string().optional(),
-  descricao_procedimento: z.string().min(2, "Selecione um procedimento"),
-  codigo_cbhpm: z.string().optional(),
-  porte_anestesico: z.string().optional(),
   convenio_id: z.string().optional(),
   convenio_nome_manual: z.string().optional(),
   anestesista_principal_id: z.string().uuid("Selecione um anestesista"),
@@ -48,6 +45,17 @@ type FormData = z.infer<typeof schema>;
 
 const inputClass = "rounded-lg border border-slate-300 px-3 py-2.5 text-sm transition";
 const inputErrorClass = "rounded-lg border border-red-400 bg-red-50 px-3 py-2.5 text-sm transition";
+
+function buildCbhpmPayload(items: CbhpmProcedimento[]) {
+  return {
+    descricao: items.map((i) => i.descricao).join(" + "),
+    codigos: items.map((i) => i.codigo).join(", "),
+    porteAnestesico: items
+      .map((i) => Number(i.porte_anestesico) || 0)
+      .reduce((a, b) => Math.max(a, b), 0)
+      .toString(),
+  };
+}
 
 export default function NovoProcedimentoPage() {
   const router = useRouter();
@@ -61,10 +69,26 @@ export default function NovoProcedimentoPage() {
   const [cbhpmQuery, setCbhpmQuery] = useState("");
   const [cbhpmResults, setCbhpmResults] = useState<CbhpmProcedimento[]>([]);
   const [cbhpmOpen, setCbhpmOpen] = useState(false);
-  const [cbhpmSelected, setCbhpmSelected] = useState<CbhpmProcedimento | null>(null);
+  const [cbhpmList, setCbhpmList] = useState<CbhpmProcedimento[]>([]);
+  const [cbhpmError, setCbhpmError] = useState("");
   const [cbhpmSearching, setCbhpmSearching] = useState(false);
   const cbhpmRef = useRef<HTMLDivElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout>>(null);
+
+  const addCbhpmItem = useCallback((item: CbhpmProcedimento) => {
+    setCbhpmList((prev) => {
+      if (prev.some((p) => p.codigo === item.codigo)) return prev;
+      return [...prev, item];
+    });
+    setCbhpmQuery("");
+    setCbhpmResults([]);
+    setCbhpmOpen(false);
+    setCbhpmError("");
+  }, []);
+
+  const removeCbhpmItem = useCallback((codigo: string) => {
+    setCbhpmList((prev) => prev.filter((p) => p.codigo !== codigo));
+  }, []);
 
   const doCbhpmSearch = useCallback(async (q: string) => {
     if (q.length < 2) {
@@ -102,7 +126,6 @@ export default function NovoProcedimentoPage() {
       data_procedimento: todayIsoDate(),
       paciente_nome: "",
       cirurgiao_nome_manual: "",
-      descricao_procedimento: "",
       convenio_nome_manual: "",
       observacoes: "",
     },
@@ -129,6 +152,12 @@ export default function NovoProcedimentoPage() {
       setLoading(true);
       setError("");
 
+      if (cbhpmList.length === 0) {
+        setCbhpmError("Selecione ao menos um procedimento.");
+        setLoading(false);
+        return;
+      }
+
       let convenioIdFinal = values.convenio_id ?? "";
       let cirurgiaoNomeFinal = "";
       if (!convenioIdFinal && values.convenio_nome_manual?.trim()) {
@@ -151,19 +180,21 @@ export default function NovoProcedimentoPage() {
         documentoUrlFinal = await uploadProcedimentoDocumento(uploadFile);
       }
 
+      const cbhpm = buildCbhpmPayload(cbhpmList);
+
       await createProcedimento({
         data_procedimento: values.data_procedimento,
         hospital_id: values.hospital_id,
         paciente_nome: values.paciente_nome,
         cirurgiao_nome: cirurgiaoNomeFinal,
-        descricao_procedimento: values.descricao_procedimento,
+        descricao_procedimento: cbhpm.descricao,
         convenio_id: convenioIdFinal,
         porte: 1,
         anestesista_principal_id: values.anestesista_principal_id,
         observacoes: values.observacoes || null,
         documento_foto_url: documentoUrlFinal,
-        codigo_cbhpm: values.codigo_cbhpm || null,
-        porte_anestesico: values.porte_anestesico || null,
+        codigo_cbhpm: cbhpm.codigos,
+        porte_anestesico: cbhpm.porteAnestesico,
       });
       await queryClient.invalidateQueries({ queryKey: ["procedimentos"] });
       toast("Procedimento criado com sucesso!");
@@ -222,22 +253,51 @@ export default function NovoProcedimentoPage() {
           </label>
         </div>
 
-        <div className="grid gap-1 text-sm" ref={cbhpmRef}>
-          <span className="font-medium text-slate-700">Procedimento (CBHPM)</span>
+        <div className="grid gap-2 text-sm" ref={cbhpmRef}>
+          <span className="font-medium text-slate-700">Procedimentos (CBHPM)</span>
+
+          {cbhpmList.length > 0 && (
+            <div className="grid gap-2">
+              {cbhpmList.map((item) => (
+                <div
+                  key={item.codigo}
+                  className="flex items-center justify-between gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2"
+                >
+                  <div className="min-w-0">
+                    <p className="text-sm text-slate-800">{item.descricao}</p>
+                    <p className="flex flex-wrap gap-3 text-xs text-slate-500">
+                      <span>
+                        Código: <span className="font-mono font-semibold text-blue-700">{item.codigo}</span>
+                      </span>
+                      {item.porte_anestesico && (
+                        <span>
+                          Porte Anestésico: <span className="font-semibold text-slate-800">{item.porte_anestesico}</span>
+                        </span>
+                      )}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    className="shrink-0 rounded p-1 text-slate-400 transition-colors hover:bg-red-100 hover:text-red-600"
+                    onClick={() => removeCbhpmItem(item.codigo)}
+                    title="Remover"
+                  >
+                    &times;
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+
           <div className="relative">
             <input
-              className={errors.descricao_procedimento ? inputErrorClass : inputClass + " w-full"}
-              placeholder="Digite o nome ou código do procedimento..."
+              className={cbhpmError ? inputErrorClass + " w-full" : inputClass + " w-full"}
+              placeholder="Digite o nome ou código para adicionar..."
               value={cbhpmQuery}
               onChange={(e) => {
                 const v = e.target.value;
                 setCbhpmQuery(v);
-                if (cbhpmSelected) {
-                  setCbhpmSelected(null);
-                  setValue("descricao_procedimento", "");
-                  setValue("codigo_cbhpm", "");
-                  setValue("porte_anestesico", "");
-                }
+                setCbhpmError("");
                 if (debounceRef.current) clearTimeout(debounceRef.current);
                 debounceRef.current = setTimeout(() => doCbhpmSearch(v), 300);
               }}
@@ -250,31 +310,31 @@ export default function NovoProcedimentoPage() {
             )}
             {cbhpmOpen && cbhpmResults.length > 0 && (
               <ul className="absolute z-20 mt-1 max-h-60 w-full overflow-auto rounded-lg border border-slate-200 bg-white shadow-lg">
-                {cbhpmResults.map((item) => (
-                  <li key={item.id}>
-                    <button
-                      type="button"
-                      className="w-full px-3 py-2 text-left text-sm hover:bg-blue-50 transition-colors"
-                      onClick={() => {
-                        setCbhpmSelected(item);
-                        setCbhpmQuery(item.descricao);
-                        setCbhpmOpen(false);
-                        setValue("descricao_procedimento", item.descricao);
-                        setValue("codigo_cbhpm", item.codigo);
-                        setValue("porte_anestesico", item.porte_anestesico ?? "");
-                      }}
-                    >
-                      <span className="font-mono text-xs text-blue-600">{item.codigo}</span>
-                      <span className="mx-1.5 text-slate-300">|</span>
-                      <span className="text-slate-800">{item.descricao}</span>
-                      {item.porte_anestesico && (
-                        <span className="ml-2 inline-block rounded bg-slate-100 px-1.5 py-0.5 text-xs text-slate-500">
-                          Porte Anest. {item.porte_anestesico}
-                        </span>
-                      )}
-                    </button>
-                  </li>
-                ))}
+                {cbhpmResults.map((item) => {
+                  const alreadyAdded = cbhpmList.some((p) => p.codigo === item.codigo);
+                  return (
+                    <li key={item.id}>
+                      <button
+                        type="button"
+                        className={`w-full px-3 py-2 text-left text-sm transition-colors ${
+                          alreadyAdded ? "bg-slate-50 text-slate-400 cursor-default" : "hover:bg-blue-50"
+                        }`}
+                        disabled={alreadyAdded}
+                        onClick={() => addCbhpmItem(item)}
+                      >
+                        <span className="font-mono text-xs text-blue-600">{item.codigo}</span>
+                        <span className="mx-1.5 text-slate-300">|</span>
+                        <span className={alreadyAdded ? "text-slate-400" : "text-slate-800"}>{item.descricao}</span>
+                        {item.porte_anestesico && (
+                          <span className="ml-2 inline-block rounded bg-slate-100 px-1.5 py-0.5 text-xs text-slate-500">
+                            Porte Anest. {item.porte_anestesico}
+                          </span>
+                        )}
+                        {alreadyAdded && <span className="ml-2 text-xs text-slate-400">(adicionado)</span>}
+                      </button>
+                    </li>
+                  );
+                })}
               </ul>
             )}
             {cbhpmOpen && cbhpmResults.length === 0 && cbhpmQuery.length >= 2 && !cbhpmSearching && (
@@ -283,30 +343,13 @@ export default function NovoProcedimentoPage() {
               </div>
             )}
           </div>
-          {errors.descricao_procedimento && <span className="text-xs text-red-600">{errors.descricao_procedimento.message}</span>}
-          <input type="hidden" {...register("descricao_procedimento")} />
-          <input type="hidden" {...register("codigo_cbhpm")} />
-          <input type="hidden" {...register("porte_anestesico")} />
+          {cbhpmError && <span className="text-xs text-red-600">{cbhpmError}</span>}
 
-          {cbhpmSelected && (
-            <div className="mt-1 flex flex-wrap gap-3 rounded-lg bg-blue-50 px-3 py-2 text-sm">
-              <span>
-                <span className="text-slate-500">Código:</span>{" "}
-                <span className="font-mono font-semibold text-blue-700">{cbhpmSelected.codigo}</span>
-              </span>
-              {cbhpmSelected.porte_anestesico && (
-                <span>
-                  <span className="text-slate-500">Porte Anestésico:</span>{" "}
-                  <span className="font-semibold text-slate-800">{cbhpmSelected.porte_anestesico}</span>
-                </span>
-              )}
-              {cbhpmSelected.porte && (
-                <span>
-                  <span className="text-slate-500">Porte:</span>{" "}
-                  <span className="font-semibold text-slate-800">{cbhpmSelected.porte}</span>
-                </span>
-              )}
-            </div>
+          {cbhpmList.length > 0 && (
+            <p className="text-xs text-slate-400">
+              {cbhpmList.length} procedimento{cbhpmList.length > 1 ? "s" : ""} selecionado{cbhpmList.length > 1 ? "s" : ""}
+              {" — "}Porte Anestésico máximo: <span className="font-semibold">{buildCbhpmPayload(cbhpmList).porteAnestesico}</span>
+            </p>
           )}
         </div>
 
