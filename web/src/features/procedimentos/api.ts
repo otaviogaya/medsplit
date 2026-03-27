@@ -110,7 +110,7 @@ export async function getProcedimentoById(id: string): Promise<ProcedimentoRow |
     .select(`
       id, data_procedimento, paciente_nome, cirurgiao_nome, descricao_procedimento,
       valor_calculado, valor_recebido, valor_glosa, status, pagamento_status,
-      forma_pagamento, data_recebimento, documento_foto_url,
+      forma_pagamento, data_recebimento, documento_foto_url, codigo_cbhpm, porte_anestesico,
       hospitais(nome),
       convenios(nome),
       anestesista_principal:anestesistas!anestesista_principal_id(nome)
@@ -146,6 +146,8 @@ export async function getProcedimentoById(id: string): Promise<ProcedimentoRow |
     data_recebimento: data.data_recebimento,
     anestesista_principal_nome: anest?.nome ?? "",
     documento_foto_url: data.documento_foto_url,
+    codigo_cbhpm: data.codigo_cbhpm,
+    porte_anestesico: data.porte_anestesico,
   };
 }
 

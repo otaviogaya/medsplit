@@ -3,7 +3,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import {
@@ -20,6 +20,10 @@ import {
   createProcedimento,
   uploadProcedimentoDocumento,
 } from "@/src/features/procedimentos/api";
+import {
+  searchCbhpmProcedimentos,
+  type CbhpmProcedimento,
+} from "@/src/features/cbhpm/api";
 import { todayIsoDate } from "@/src/lib/format";
 import { getErrorMessage } from "@/src/lib/error";
 import { BackLink } from "@/src/components/back-link";
@@ -31,7 +35,9 @@ const schema = z.object({
   paciente_nome: z.string().min(2, "Nome do paciente obrigatório"),
   cirurgiao_id: z.string().optional(),
   cirurgiao_nome_manual: z.string().optional(),
-  descricao_procedimento: z.string().min(2, "Descrição obrigatória"),
+  descricao_procedimento: z.string().min(2, "Selecione um procedimento"),
+  codigo_cbhpm: z.string().optional(),
+  porte_anestesico: z.string().optional(),
   convenio_id: z.string().optional(),
   convenio_nome_manual: z.string().optional(),
   anestesista_principal_id: z.string().uuid("Selecione um anestesista"),
@@ -51,6 +57,39 @@ export default function NovoProcedimentoPage() {
   const [uploadFile, setUploadFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+
+  const [cbhpmQuery, setCbhpmQuery] = useState("");
+  const [cbhpmResults, setCbhpmResults] = useState<CbhpmProcedimento[]>([]);
+  const [cbhpmOpen, setCbhpmOpen] = useState(false);
+  const [cbhpmSelected, setCbhpmSelected] = useState<CbhpmProcedimento | null>(null);
+  const [cbhpmSearching, setCbhpmSearching] = useState(false);
+  const cbhpmRef = useRef<HTMLDivElement>(null);
+  const debounceRef = useRef<ReturnType<typeof setTimeout>>(null);
+
+  const doCbhpmSearch = useCallback(async (q: string) => {
+    if (q.length < 2) {
+      setCbhpmResults([]);
+      return;
+    }
+    setCbhpmSearching(true);
+    try {
+      const results = await searchCbhpmProcedimentos(q);
+      setCbhpmResults(results);
+      setCbhpmOpen(true);
+    } finally {
+      setCbhpmSearching(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (cbhpmRef.current && !cbhpmRef.current.contains(e.target as Node)) {
+        setCbhpmOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   const {
     register,
@@ -123,6 +162,8 @@ export default function NovoProcedimentoPage() {
         anestesista_principal_id: values.anestesista_principal_id,
         observacoes: values.observacoes || null,
         documento_foto_url: documentoUrlFinal,
+        codigo_cbhpm: values.codigo_cbhpm || null,
+        porte_anestesico: values.porte_anestesico || null,
       });
       await queryClient.invalidateQueries({ queryKey: ["procedimentos"] });
       toast("Procedimento criado com sucesso!");
@@ -181,11 +222,93 @@ export default function NovoProcedimentoPage() {
           </label>
         </div>
 
-        <label className="grid gap-1 text-sm">
-          <span className="font-medium text-slate-700">Procedimento</span>
-          <input className={errors.descricao_procedimento ? inputErrorClass : inputClass} placeholder="Descrição do procedimento" {...register("descricao_procedimento")} />
+        <div className="grid gap-1 text-sm" ref={cbhpmRef}>
+          <span className="font-medium text-slate-700">Procedimento (CBHPM)</span>
+          <div className="relative">
+            <input
+              className={errors.descricao_procedimento ? inputErrorClass : inputClass + " w-full"}
+              placeholder="Digite o nome ou código do procedimento..."
+              value={cbhpmQuery}
+              onChange={(e) => {
+                const v = e.target.value;
+                setCbhpmQuery(v);
+                if (cbhpmSelected) {
+                  setCbhpmSelected(null);
+                  setValue("descricao_procedimento", "");
+                  setValue("codigo_cbhpm", "");
+                  setValue("porte_anestesico", "");
+                }
+                if (debounceRef.current) clearTimeout(debounceRef.current);
+                debounceRef.current = setTimeout(() => doCbhpmSearch(v), 300);
+              }}
+              onFocus={() => {
+                if (cbhpmResults.length > 0) setCbhpmOpen(true);
+              }}
+            />
+            {cbhpmSearching && (
+              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-400">Buscando...</span>
+            )}
+            {cbhpmOpen && cbhpmResults.length > 0 && (
+              <ul className="absolute z-20 mt-1 max-h-60 w-full overflow-auto rounded-lg border border-slate-200 bg-white shadow-lg">
+                {cbhpmResults.map((item) => (
+                  <li key={item.id}>
+                    <button
+                      type="button"
+                      className="w-full px-3 py-2 text-left text-sm hover:bg-blue-50 transition-colors"
+                      onClick={() => {
+                        setCbhpmSelected(item);
+                        setCbhpmQuery(item.descricao);
+                        setCbhpmOpen(false);
+                        setValue("descricao_procedimento", item.descricao);
+                        setValue("codigo_cbhpm", item.codigo);
+                        setValue("porte_anestesico", item.porte_anestesico ?? "");
+                      }}
+                    >
+                      <span className="font-mono text-xs text-blue-600">{item.codigo}</span>
+                      <span className="mx-1.5 text-slate-300">|</span>
+                      <span className="text-slate-800">{item.descricao}</span>
+                      {item.porte_anestesico && (
+                        <span className="ml-2 inline-block rounded bg-slate-100 px-1.5 py-0.5 text-xs text-slate-500">
+                          Porte Anest. {item.porte_anestesico}
+                        </span>
+                      )}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+            {cbhpmOpen && cbhpmResults.length === 0 && cbhpmQuery.length >= 2 && !cbhpmSearching && (
+              <div className="absolute z-20 mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-3 text-center text-sm text-slate-400 shadow-lg">
+                Nenhum procedimento encontrado.
+              </div>
+            )}
+          </div>
           {errors.descricao_procedimento && <span className="text-xs text-red-600">{errors.descricao_procedimento.message}</span>}
-        </label>
+          <input type="hidden" {...register("descricao_procedimento")} />
+          <input type="hidden" {...register("codigo_cbhpm")} />
+          <input type="hidden" {...register("porte_anestesico")} />
+
+          {cbhpmSelected && (
+            <div className="mt-1 flex flex-wrap gap-3 rounded-lg bg-blue-50 px-3 py-2 text-sm">
+              <span>
+                <span className="text-slate-500">Código:</span>{" "}
+                <span className="font-mono font-semibold text-blue-700">{cbhpmSelected.codigo}</span>
+              </span>
+              {cbhpmSelected.porte_anestesico && (
+                <span>
+                  <span className="text-slate-500">Porte Anestésico:</span>{" "}
+                  <span className="font-semibold text-slate-800">{cbhpmSelected.porte_anestesico}</span>
+                </span>
+              )}
+              {cbhpmSelected.porte && (
+                <span>
+                  <span className="text-slate-500">Porte:</span>{" "}
+                  <span className="font-semibold text-slate-800">{cbhpmSelected.porte}</span>
+                </span>
+              )}
+            </div>
+          )}
+        </div>
 
         <div className="grid gap-4 sm:grid-cols-2">
           <label className="grid gap-1 text-sm">

@@ -211,6 +211,18 @@ export default function ProcedimentoDetailPage() {
             <span className="text-xs font-medium uppercase tracking-wide text-slate-400">Procedimento</span>
             <span className="text-slate-800">{procedimento.descricao_procedimento}</span>
           </div>
+          {procedimento.codigo_cbhpm && (
+            <div className="grid gap-0.5">
+              <span className="text-xs font-medium uppercase tracking-wide text-slate-400">Código CBHPM</span>
+              <span className="font-mono text-slate-800">{procedimento.codigo_cbhpm}</span>
+            </div>
+          )}
+          {procedimento.porte_anestesico && (
+            <div className="grid gap-0.5">
+              <span className="text-xs font-medium uppercase tracking-wide text-slate-400">Porte Anestésico</span>
+              <span className="text-slate-800">{procedimento.porte_anestesico}</span>
+            </div>
+          )}
           <div className="grid gap-0.5">
             <span className="text-xs font-medium uppercase tracking-wide text-slate-400">Anestesista</span>
             <span className="text-slate-800">{procedimento.anestesista_principal_nome}</span>

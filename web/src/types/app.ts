@@ -33,4 +33,6 @@ export type ProcedimentoCreatePayload = {
   anestesista_principal_id: string;
   observacoes?: string | null;
   documento_foto_url?: string | null;
+  codigo_cbhpm?: string | null;
+  porte_anestesico?: string | null;
 };

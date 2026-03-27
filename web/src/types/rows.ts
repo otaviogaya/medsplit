@@ -15,6 +15,8 @@ export type ProcedimentoRow = {
   forma_pagamento: "dinheiro" | "pix" | "cartao" | null;
   anestesista_principal_nome: string;
   documento_foto_url: string | null;
+  codigo_cbhpm: string | null;
+  porte_anestesico: string | null;
 };
 
 export type RepasseRow = {
