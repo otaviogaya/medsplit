@@ -208,26 +208,32 @@ export default function ProcedimentoDetailPage() {
             <span className="text-slate-800">{procedimento.cirurgiao_nome}</span>
           </div>
           <div className="grid gap-0.5">
-            <span className="text-xs font-medium uppercase tracking-wide text-slate-400">Procedimento</span>
-            <span className="text-slate-800">{procedimento.descricao_procedimento}</span>
-          </div>
-          {procedimento.codigo_cbhpm && (
-            <div className="grid gap-0.5">
-              <span className="text-xs font-medium uppercase tracking-wide text-slate-400">Código CBHPM</span>
-              <span className="font-mono text-slate-800">{procedimento.codigo_cbhpm}</span>
-            </div>
-          )}
-          {procedimento.porte_anestesico && (
-            <div className="grid gap-0.5">
-              <span className="text-xs font-medium uppercase tracking-wide text-slate-400">Porte Anestésico</span>
-              <span className="text-slate-800">{procedimento.porte_anestesico}</span>
-            </div>
-          )}
-          <div className="grid gap-0.5">
             <span className="text-xs font-medium uppercase tracking-wide text-slate-400">Anestesista</span>
             <span className="text-slate-800">{procedimento.anestesista_principal_nome}</span>
           </div>
         </div>
+
+        {procedimento.codigo_cbhpm && (() => {
+          const codigos = procedimento.codigo_cbhpm!.split(", ");
+          const descricoes = procedimento.descricao_procedimento.split(" + ");
+          const portes = procedimento.porte_anestesico ? procedimento.porte_anestesico.split(", ") : [];
+          return (
+            <div className="mt-4 grid gap-2">
+              <span className="text-xs font-medium uppercase tracking-wide text-slate-400">Procedimentos</span>
+              {codigos.map((cod, i) => (
+                <div key={cod} className="flex items-start gap-3 rounded-lg border border-slate-100 bg-slate-50 px-3 py-2 text-sm">
+                  <span className="shrink-0 font-mono text-xs font-semibold text-blue-600">{cod}</span>
+                  <span className="flex-1 text-slate-800">{descricoes[i] ?? ""}</span>
+                  {portes[i] && portes[i] !== "0" && (
+                    <span className="shrink-0 rounded bg-slate-200 px-1.5 py-0.5 text-xs text-slate-600">
+                      Porte Anest. {portes[i]}
+                    </span>
+                  )}
+                </div>
+              ))}
+            </div>
+          );
+        })()}
 
         {procedimento.documento_foto_url ? (
           <a

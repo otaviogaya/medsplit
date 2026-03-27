@@ -170,12 +170,20 @@ export default function ProcedimentosPage() {
                   {`${String(seq).padStart(4, "0")}/${dayjs(item.data_procedimento).format("MM")}`}
                 </p>
                 <p className="text-lg font-semibold text-slate-900 group-hover:text-blue-700">{item.paciente_nome}</p>
-                {item.codigo_cbhpm && (
-                  <p className="text-xs text-blue-600">
-                    <span className="font-mono">{item.codigo_cbhpm}</span>
+                {item.codigo_cbhpm ? (
+                  <p className="text-xs text-slate-600">
+                    <span className="font-mono text-blue-600">{item.codigo_cbhpm.split(", ")[0]}</span>
                     <span className="mx-1 text-slate-300">|</span>
-                    <span className="text-slate-500">{item.descricao_procedimento}</span>
+                    <span>{item.descricao_procedimento.split(" + ")[0]}</span>
+                    {item.porte_anestesico && (
+                      <>
+                        <span className="mx-1 text-slate-300">|</span>
+                        <span className="text-slate-500">Porte Anest. {item.porte_anestesico.split(", ")[0]}</span>
+                      </>
+                    )}
                   </p>
+                ) : (
+                  <p className="text-xs text-slate-500">{item.descricao_procedimento}</p>
                 )}
                 <p className="text-sm text-slate-600">Anestesista: {item.anestesista_principal_nome}</p>
                 <p className="text-sm text-slate-500">{toDate(item.data_procedimento)}</p>

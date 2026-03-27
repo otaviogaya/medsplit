@@ -50,10 +50,7 @@ function buildCbhpmPayload(items: CbhpmProcedimento[]) {
   return {
     descricao: items.map((i) => i.descricao).join(" + "),
     codigos: items.map((i) => i.codigo).join(", "),
-    porteAnestesico: items
-      .map((i) => Number(i.porte_anestesico) || 0)
-      .reduce((a, b) => Math.max(a, b), 0)
-      .toString(),
+    porteAnestesico: items.map((i) => i.porte_anestesico || "0").join(", "),
   };
 }
 
@@ -348,7 +345,7 @@ export default function NovoProcedimentoPage() {
                 </div>
               ))}
               <p className="text-xs text-slate-400">
-                Porte Anestésico máximo: <span className="font-semibold text-slate-700">{buildCbhpmPayload(cbhpmList).porteAnestesico}</span>
+                {cbhpmList.length} procedimento{cbhpmList.length > 1 ? "s" : ""}
               </p>
             </div>
           )}
