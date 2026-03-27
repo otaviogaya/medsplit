@@ -4,6 +4,7 @@ import {
   ProcedimentoFilter,
   ProcedimentoStatus,
 } from "@/src/types/app";
+import { ProcedimentoRow } from "@/src/types/rows";
 
 const DOCUMENTOS_BUCKET = "procedimentos-documentos";
 
@@ -101,6 +102,51 @@ export async function updateValorCalculado(id: string, valor: number) {
     p_valor: valor,
   });
   if (error) throw error;
+}
+
+export async function getProcedimentoById(id: string): Promise<ProcedimentoRow | null> {
+  const { data, error } = await supabase
+    .from("procedimentos")
+    .select(`
+      id, data_procedimento, paciente_nome, cirurgiao_nome, descricao_procedimento,
+      valor_calculado, valor_recebido, valor_glosa, status, pagamento_status,
+      forma_pagamento, data_recebimento, documento_foto_url,
+      hospitais(nome),
+      convenios(nome),
+      anestesista_principal:anestesistas!anestesista_principal_id(nome)
+    `)
+    .eq("id", id)
+    .single();
+
+  if (error) {
+    if (error.code === "PGRST116") return null;
+    throw error;
+  }
+  if (!data) return null;
+
+  const row = data as Record<string, unknown>;
+  const hosp = row.hospitais as { nome: string } | null;
+  const conv = row.convenios as { nome: string } | null;
+  const anest = row.anestesista_principal as { nome: string } | null;
+
+  return {
+    id: data.id,
+    data_procedimento: data.data_procedimento,
+    hospital_nome: hosp?.nome ?? "",
+    paciente_nome: data.paciente_nome,
+    cirurgiao_nome: data.cirurgiao_nome,
+    descricao_procedimento: data.descricao_procedimento,
+    convenio_nome: conv?.nome ?? "",
+    valor_calculado: data.valor_calculado,
+    valor_recebido: data.valor_recebido,
+    valor_glosa: data.valor_glosa,
+    status: data.status as ProcedimentoRow["status"],
+    pagamento_status: data.pagamento_status as ProcedimentoRow["pagamento_status"],
+    forma_pagamento: data.forma_pagamento as ProcedimentoRow["forma_pagamento"],
+    data_recebimento: data.data_recebimento,
+    anestesista_principal_nome: anest?.nome ?? "",
+    documento_foto_url: data.documento_foto_url,
+  };
 }
 
 export async function updateGlosaInfo(

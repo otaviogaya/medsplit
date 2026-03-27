@@ -5,7 +5,7 @@ import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/src/features/auth/auth-context";
 import {
-  listProcedimentos,
+  getProcedimentoById,
   updatePagamentoProcedimento,
   updateStatusProcedimento,
   updateValorCalculado,
@@ -14,7 +14,7 @@ import { toDate, toMoney, todayIsoDate } from "@/src/lib/format";
 import { getErrorMessage } from "@/src/lib/error";
 import { formaPagamentoLabel, pagamentoStatusLabel } from "@/src/lib/status";
 import { ProcedimentoStatus } from "@/src/types/app";
-import { ProcedimentoRow } from "@/src/types/rows";
+import type { ProcedimentoRow } from "@/src/types/rows";
 import { BackLink } from "@/src/components/back-link";
 import { useConfirm } from "@/src/components/confirm-dialog";
 import { useToast } from "@/src/components/toast";
@@ -34,11 +34,11 @@ export default function ProcedimentoDetailPage() {
   const [savingValor, setSavingValor] = useState(false);
   const [error, setError] = useState("");
 
-  const { data = [], isLoading } = useQuery<ProcedimentoRow[]>({
+  const { data: procedimento, isLoading } = useQuery<ProcedimentoRow | null>({
     queryKey: ["procedimento-detail", id],
-    queryFn: async () => (await listProcedimentos({})) as ProcedimentoRow[],
+    queryFn: () => getProcedimentoById(id),
+    staleTime: 0,
   });
-  const procedimento = data.find((item) => item.id === id);
 
   const mutation = useMutation({
     mutationFn: (status: ProcedimentoStatus) =>
@@ -73,7 +73,7 @@ export default function ProcedimentoDetailPage() {
       setError("");
       const valor = Number(valorCalculado.replace(",", ".")) || 0;
       if (!formaPagamento) throw new Error("Selecione a forma de pagamento.");
-      if (valor <= 0) throw new Error("Informe o valor calculado.");
+      if (valor <= 0) throw new Error("Informe o valor.");
 
       await updateValorCalculado(id, valor);
       await updateStatusProcedimento({
@@ -143,7 +143,7 @@ export default function ProcedimentoDetailPage() {
     setSavingValor(true);
     try {
       await updateValorCalculado(id, v);
-      toast("Valor calculado salvo!");
+      toast("Valor salvo!");
       await queryClient.invalidateQueries({ queryKey: ["procedimentos"] });
       await queryClient.invalidateQueries({ queryKey: ["procedimento-detail", id] });
     } catch (err: unknown) {
@@ -230,7 +230,7 @@ export default function ProcedimentoDetailPage() {
 
         <div className="mt-5 grid gap-2 rounded-lg bg-slate-50 p-4 text-sm sm:grid-cols-2">
           <div className="flex justify-between sm:flex-col sm:gap-0.5">
-            <span className="text-slate-500">Valor calculado</span>
+            <span className="text-slate-500">Valor</span>
             <span className="font-semibold text-slate-900">{toMoney(procedimento.valor_calculado)}</span>
           </div>
           <div className="flex justify-between sm:flex-col sm:gap-0.5">
@@ -256,7 +256,7 @@ export default function ProcedimentoDetailPage() {
 
           <div className="grid gap-3 sm:grid-cols-2">
             <label className="grid gap-1 text-sm">
-              <span className="font-medium text-slate-700">Valor calculado</span>
+              <span className="font-medium text-slate-700">Valor</span>
               <input
                 className="rounded-lg border border-slate-300 px-3 py-2.5 text-sm"
                 value={valorCalculado}
@@ -271,7 +271,7 @@ export default function ProcedimentoDetailPage() {
                 onClick={onSalvarValorCalculado}
                 type="button"
               >
-                {savingValor ? "Salvando..." : "Salvar valor calculado"}
+                {savingValor ? "Salvando..." : "Salvar valor"}
               </button>
             </div>
           </div>
@@ -301,7 +301,7 @@ export default function ProcedimentoDetailPage() {
             </label>
           </div>
 
-          <p className="text-xs text-slate-400">Ao marcar como pago, o valor pago será igual ao valor calculado.</p>
+          <p className="text-xs text-slate-400">Ao marcar como pago, o valor pago será igual ao valor informado.</p>
 
           {error ? (
             <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div>
