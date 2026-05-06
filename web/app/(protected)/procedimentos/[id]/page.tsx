@@ -145,6 +145,9 @@ export default function ProcedimentoDetailPage() {
       pagamento_status: procedimento.pagamento_status,
       numero_lancamento: procedimento.numero_lancamento ?? 0,
       data_procedimento: procedimento.data_procedimento,
+      feriado: procedimento.feriado,
+      adicional_fim_semana: procedimento.adicional_fim_semana,
+      adicional_noturno: procedimento.adicional_noturno,
     };
   }, [procedimento]);
 
