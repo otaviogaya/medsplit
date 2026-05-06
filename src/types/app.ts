@@ -9,6 +9,8 @@ export type ProcedimentoStatus =
 
 export type RepasseStatus = "pendente" | "pago";
 
+export type FormaPagamentoTipo = "dinheiro" | "pix" | "cartao" | "cheque";
+
 export type CadastroItem = {
   id: string;
   nome: string;

@@ -9,6 +9,8 @@ export type ProcedimentoStatus =
 
 export type RepasseStatus = "pendente" | "pago";
 
+export type FormaPagamentoTipo = "dinheiro" | "pix" | "cartao" | "cheque";
+
 export type CadastroItem = {
   id: string;
   nome: string;
@@ -31,6 +33,7 @@ export type ProcedimentoCreatePayload = {
   convenio_id: string;
   porte: number;
   anestesista_principal_id: string;
+  valor_calculado?: number;
   observacoes?: string | null;
   documento_foto_url?: string | null;
   codigo_cbhpm?: string | null;

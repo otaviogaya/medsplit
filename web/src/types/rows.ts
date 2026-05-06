@@ -1,3 +1,5 @@
+import type { FormaPagamentoTipo } from "@/src/types/app";
+
 export type ProcedimentoRow = {
   id: string;
   data_procedimento: string;
@@ -6,13 +8,15 @@ export type ProcedimentoRow = {
   cirurgiao_nome: string;
   descricao_procedimento: string;
   convenio_nome: string;
+  /** Sequência por equipe na ordem de lançamento (criação). */
+  numero_lancamento: number;
   valor_calculado: number | null;
   valor_recebido: number | null;
   valor_glosa: number | null;
   status: "realizado" | "faturado" | "glosa" | "recebido" | "cancelado";
   pagamento_status: "nao_pago" | "pago";
   data_recebimento: string | null;
-  forma_pagamento: "dinheiro" | "pix" | "cartao" | null;
+  forma_pagamento: FormaPagamentoTipo | null;
   anestesista_principal_nome: string;
   documento_foto_url: string | null;
   codigo_cbhpm: string | null;

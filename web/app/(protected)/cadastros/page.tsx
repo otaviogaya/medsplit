@@ -2,14 +2,12 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/src/features/auth/auth-context";
 import {
   createAnestesista,
   createConvenio,
-  createHonorario,
   createHospital,
-  listConvenios,
 } from "@/src/features/cadastros/api";
 import { getErrorMessage } from "@/src/lib/error";
 import { useToast } from "@/src/components/toast";
@@ -23,13 +21,7 @@ export default function CadastrosPage() {
   const [hospital, setHospital] = useState({ nome: "", cidade: "", contato_faturamento: "" });
   const [convenio, setConvenio] = useState("");
   const [anestesista, setAnestesista] = useState("");
-  const [honorario, setHonorario] = useState({ convenio_id: "", porte: "1", valor: "0" });
   const [error, setError] = useState("");
-
-  const { data: convenios = [] } = useQuery({
-    queryKey: ["convenios"],
-    queryFn: listConvenios,
-  });
 
   const genericMutation = useMutation({
     mutationFn: async (action: () => Promise<void>) => action(),
@@ -117,33 +109,6 @@ export default function CadastrosPage() {
           </button>
         </section>
 
-        <section className="grid gap-3 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Tabela de honorários</h2>
-          <select className={inputClass} value={honorario.convenio_id} onChange={(e) => setHonorario({ ...honorario, convenio_id: e.target.value })}>
-            <option value="">Selecione um convênio</option>
-            {convenios.map((item) => (
-              <option key={item.id} value={item.id}>{item.nome}</option>
-            ))}
-          </select>
-          <input className={inputClass} placeholder="Porte" value={honorario.porte} onChange={(e) => setHonorario({ ...honorario, porte: e.target.value })} />
-          <input className={inputClass} placeholder="Valor" value={honorario.valor} onChange={(e) => setHonorario({ ...honorario, valor: e.target.value })} />
-          <button
-            className="rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:opacity-60"
-            disabled={genericMutation.isPending}
-            onClick={() =>
-              genericMutation.mutate(() =>
-                createHonorario({
-                  convenio_id: honorario.convenio_id,
-                  porte: Number(honorario.porte),
-                  valor: Number(honorario.valor),
-                }),
-              )
-            }
-            type="button"
-          >
-            Salvar honorário
-          </button>
-        </section>
       </div>
     </div>
   );

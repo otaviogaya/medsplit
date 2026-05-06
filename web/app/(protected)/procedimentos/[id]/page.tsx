@@ -10,15 +10,23 @@ import {
   updateStatusProcedimento,
   updateValorCalculado,
 } from "@/src/features/procedimentos/api";
-import { toDate, toMoney, todayIsoDate } from "@/src/lib/format";
+import { toDate, toMoney, todayIsoDate, formatProcedimentoNumero } from "@/src/lib/format";
 import { getErrorMessage } from "@/src/lib/error";
 import { formaPagamentoLabel, pagamentoStatusLabel } from "@/src/lib/status";
-import { ProcedimentoStatus } from "@/src/types/app";
+import { FormaPagamentoTipo, ProcedimentoStatus } from "@/src/types/app";
 import type { ProcedimentoRow } from "@/src/types/rows";
 import { BackLink } from "@/src/components/back-link";
 import { useConfirm } from "@/src/components/confirm-dialog";
 import { useToast } from "@/src/components/toast";
 import { SkeletonList } from "@/src/components/skeleton";
+
+function parseValorFinanceiro(input: string): { ok: true; value: number } | { ok: false } {
+  const raw = input.trim().replace(",", ".");
+  if (raw === "") return { ok: true, value: 0 };
+  const n = Number(raw);
+  if (!Number.isFinite(n) || n < 0) return { ok: false };
+  return { ok: true, value: n };
+}
 
 export default function ProcedimentoDetailPage() {
   const params = useParams<{ id: string }>();
@@ -29,7 +37,7 @@ export default function ProcedimentoDetailPage() {
   const { confirm, dialog: confirmDialog } = useConfirm();
   const [valorCalculado, setValorCalculado] = useState("");
   const [dataRecebimento, setDataRecebimento] = useState(todayIsoDate());
-  const [formaPagamento, setFormaPagamento] = useState<"dinheiro" | "pix" | "cartao" | "">("");
+  const [formaPagamento, setFormaPagamento] = useState<FormaPagamentoTipo | "">("");
   const [saving, setSaving] = useState(false);
   const [savingValor, setSavingValor] = useState(false);
   const [error, setError] = useState("");
@@ -61,8 +69,8 @@ export default function ProcedimentoDetailPage() {
 
   useEffect(() => {
     if (!procedimento) return;
-    const v = procedimento.valor_calculado ?? procedimento.valor_recebido ?? 0;
-    setValorCalculado(v ? String(v) : "");
+    const v = procedimento.valor_calculado ?? procedimento.valor_recebido;
+    setValorCalculado(v != null ? String(v) : "");
     setDataRecebimento(procedimento.data_recebimento ?? todayIsoDate());
     setFormaPagamento(procedimento.forma_pagamento ?? "");
   }, [procedimento]);
@@ -71,9 +79,10 @@ export default function ProcedimentoDetailPage() {
     try {
       setSaving(true);
       setError("");
-      const valor = Number(valorCalculado.replace(",", ".")) || 0;
+      const parsed = parseValorFinanceiro(valorCalculado);
+      if (!parsed.ok) throw new Error("Informe um valor numérico válido (zero ou maior).");
+      const valor = parsed.value;
       if (!formaPagamento) throw new Error("Selecione a forma de pagamento.");
-      if (valor <= 0) throw new Error("Informe o valor.");
 
       await updateValorCalculado(id, valor);
       await updateStatusProcedimento({
@@ -138,11 +147,15 @@ export default function ProcedimentoDetailPage() {
   }
 
   async function onSalvarValorCalculado() {
-    const v = Number(valorCalculado.replace(",", ".")) || 0;
-    if (v <= 0) return;
+    const parsed = parseValorFinanceiro(valorCalculado);
+    if (!parsed.ok) {
+      setError("Informe um valor numérico válido (zero ou maior).");
+      return;
+    }
     setSavingValor(true);
+    setError("");
     try {
-      await updateValorCalculado(id, v);
+      await updateValorCalculado(id, parsed.value);
       toast("Valor salvo!");
       await queryClient.invalidateQueries({ queryKey: ["procedimentos"] });
       await queryClient.invalidateQueries({ queryKey: ["procedimento-detail", id] });
@@ -180,7 +193,12 @@ export default function ProcedimentoDetailPage() {
 
       <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
         <div className="flex flex-wrap items-start justify-between gap-2">
-          <h1 className="text-2xl font-semibold text-slate-900">{procedimento.paciente_nome}</h1>
+          <div className="grid gap-1">
+            <p className="text-xs text-slate-400">
+              Nº {formatProcedimentoNumero(procedimento.numero_lancamento ?? 0, procedimento.data_procedimento)}
+            </p>
+            <h1 className="text-2xl font-semibold text-slate-900">{procedimento.paciente_nome}</h1>
+          </div>
           <span
             className={`shrink-0 rounded-full px-3 py-1 text-xs font-semibold text-white ${
               procedimento.pagamento_status === "pago" ? "bg-green-600" : "bg-red-600"
@@ -309,12 +327,13 @@ export default function ProcedimentoDetailPage() {
               <select
                 className="rounded-lg border border-slate-300 px-3 py-2.5 text-sm"
                 value={formaPagamento}
-                onChange={(e) => setFormaPagamento(e.target.value as "dinheiro" | "pix" | "cartao" | "")}
+                onChange={(e) => setFormaPagamento(e.target.value as FormaPagamentoTipo | "")}
               >
                 <option value="">Selecione...</option>
                 <option value="dinheiro">Dinheiro</option>
                 <option value="pix">Pix</option>
                 <option value="cartao">Cartão</option>
+                <option value="cheque">Cheque</option>
               </select>
             </label>
           </div>

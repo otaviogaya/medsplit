@@ -18,7 +18,7 @@ import {
   updateValorCalculado,
 } from "../api";
 import { useAuth } from "../../auth/context/AuthContext";
-import { ProcedimentoStatus } from "../../../types/app";
+import { ProcedimentoStatus, FormaPagamentoTipo } from "../../../types/app";
 import { useEffect } from "react";
 
 export function ProcedimentoDetailScreen({ route }: any) {
@@ -27,7 +27,7 @@ export function ProcedimentoDetailScreen({ route }: any) {
   const queryClient = useQueryClient();
   const [valorCalculado, setValorCalculado] = useState("");
   const [dataRecebimento, setDataRecebimento] = useState(todayIsoDate());
-  const [formaPagamento, setFormaPagamento] = useState<"dinheiro" | "pix" | "cartao" | "">("");
+  const [formaPagamento, setFormaPagamento] = useState<FormaPagamentoTipo | "">("");
   const [isImageOpen, setIsImageOpen] = useState(false);
   const [isFinanceSaving, setIsFinanceSaving] = useState(false);
 
@@ -65,7 +65,7 @@ export function ProcedimentoDetailScreen({ route }: any) {
 
   async function onMarcarPago() {
     if (!formaPagamento) {
-      Alert.alert("Forma de pagamento", "Selecione dinheiro, pix ou cartao.");
+      Alert.alert("Forma de pagamento", "Selecione uma forma de pagamento.");
       return;
     }
     const valor = Number(valorCalculado?.replace(",", ".")) || 0;
@@ -219,11 +219,12 @@ export function ProcedimentoDetailScreen({ route }: any) {
           <FormSelect
             label="Forma de pagamento"
             value={formaPagamento}
-            onChange={(value) => setFormaPagamento(value as "dinheiro" | "pix" | "cartao")}
+            onChange={(value) => setFormaPagamento(value as FormaPagamentoTipo)}
             options={[
               { label: "Dinheiro", value: "dinheiro" },
               { label: "Pix", value: "pix" },
-              { label: "Cartao", value: "cartao" },
+              { label: "Cartão", value: "cartao" },
+              { label: "Cheque", value: "cheque" },
             ]}
           />
           <Text variant="bodySmall">Valor pago = valor calculado ao marcar como pago.</Text>

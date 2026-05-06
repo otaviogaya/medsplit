@@ -1,5 +1,6 @@
 import { supabase } from "@/src/lib/supabase";
 import {
+  FormaPagamentoTipo,
   ProcedimentoCreatePayload,
   ProcedimentoFilter,
   ProcedimentoStatus,
@@ -51,7 +52,7 @@ type UpdateStatusInput = {
   data_recebimento?: string | null;
   valor_recebido?: number | null;
   observacoes?: string | null;
-  forma_pagamento?: "dinheiro" | "pix" | "cartao" | null;
+  forma_pagamento?: FormaPagamentoTipo | null;
 };
 
 export async function updateStatusProcedimento(input: UpdateStatusInput) {
@@ -111,6 +112,7 @@ export async function getProcedimentoById(id: string): Promise<ProcedimentoRow |
       id, data_procedimento, paciente_nome, cirurgiao_nome, descricao_procedimento,
       valor_calculado, valor_recebido, valor_glosa, status, pagamento_status,
       forma_pagamento, data_recebimento, documento_foto_url, codigo_cbhpm, porte_anestesico,
+      numero_lancamento,
       hospitais(nome),
       convenios(nome),
       anestesista_principal:anestesistas!anestesista_principal_id(nome)
@@ -137,6 +139,7 @@ export async function getProcedimentoById(id: string): Promise<ProcedimentoRow |
     cirurgiao_nome: data.cirurgiao_nome,
     descricao_procedimento: data.descricao_procedimento,
     convenio_nome: conv?.nome ?? "",
+    numero_lancamento: (data as { numero_lancamento?: number }).numero_lancamento ?? 0,
     valor_calculado: data.valor_calculado,
     valor_recebido: data.valor_recebido,
     valor_glosa: data.valor_glosa,

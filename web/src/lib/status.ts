@@ -1,4 +1,11 @@
-import { ProcedimentoStatus } from "@/src/types/app";
+import { FormaPagamentoTipo, ProcedimentoStatus } from "@/src/types/app";
+
+const formaPagamentoLabels: Record<FormaPagamentoTipo, string> = {
+  dinheiro: "Dinheiro",
+  pix: "Pix",
+  cartao: "Cartão",
+  cheque: "Cheque",
+};
 
 export function procedimentoStatusLabel(status?: ProcedimentoStatus | null) {
   if (!status) return "-";
@@ -17,9 +24,7 @@ export function pagamentoStatusLabel(status?: "pago" | "nao_pago" | null) {
   return "Pago";
 }
 
-export function formaPagamentoLabel(forma?: "dinheiro" | "pix" | "cartao" | null) {
+export function formaPagamentoLabel(forma?: FormaPagamentoTipo | null) {
   if (!forma) return "-";
-  if (forma === "pix") return "Pix";
-  if (forma === "cartao") return "Cartao";
-  return "Dinheiro";
+  return formaPagamentoLabels[forma];
 }

@@ -24,3 +24,11 @@ export function toIsoDateLocal(date: Date) {
 export function todayIsoDate() {
   return toIsoDateLocal(new Date());
 }
+
+/** Ex.: 0001/05-2026 — sequência da equipe no mês de data_procedimento (reinicia a cada mês). */
+export function formatProcedimentoNumero(numeroLancamento: number, dataProcedimento: string) {
+  const d = new Date(`${dataProcedimento}T12:00:00`);
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const yyyy = String(d.getFullYear());
+  return `${String(numeroLancamento).padStart(4, "0")}/${mm}-${yyyy}`;
+}

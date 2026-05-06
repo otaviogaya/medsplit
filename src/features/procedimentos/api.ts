@@ -1,5 +1,5 @@
 import { supabase } from "../../lib/supabase";
-import { ProcedimentoCreatePayload, ProcedimentoFilter, ProcedimentoStatus } from "../../types/app";
+import { FormaPagamentoTipo, ProcedimentoCreatePayload, ProcedimentoFilter, ProcedimentoStatus } from "../../types/app";
 
 const DOCUMENTOS_BUCKET = "procedimentos-documentos";
 
@@ -52,7 +52,7 @@ type UpdateStatusInput = {
   data_recebimento?: string | null;
   valor_recebido?: number | null;
   observacoes?: string | null;
-  forma_pagamento?: "dinheiro" | "pix" | "cartao" | null;
+  forma_pagamento?: FormaPagamentoTipo | null;
 };
 
 export async function updateStatusProcedimento(input: UpdateStatusInput) {

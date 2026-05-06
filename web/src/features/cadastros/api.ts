@@ -112,11 +112,3 @@ export async function createAnestesista(payload: {
   if (error) throw error;
 }
 
-export async function createHonorario(payload: {
-  convenio_id: string;
-  porte: number;
-  valor: number;
-}) {
-  const { error } = await supabase.from("tabela_honorarios").insert(payload);
-  if (error) throw error;
-}

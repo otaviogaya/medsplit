@@ -6,7 +6,7 @@ import { FlatList, Modal, Pressable, StyleSheet, View } from "react-native";
 import { Button, Card, IconButton, Text, TextInput } from "react-native-paper";
 import { DateInput } from "../../../components/DateInput";
 import { MonthInput } from "../../../components/MonthInput";
-import { toDate } from "../../../lib/format";
+import { toDate, formatProcedimentoNumero } from "../../../lib/format";
 import { pagamentoStatusLabel } from "../../../lib/status";
 import { listProcedimentos } from "../api";
 
@@ -101,7 +101,7 @@ export function ProcedimentosScreen() {
         refreshing={isLoading}
         onRefresh={refetch}
         keyExtractor={(item: any) => item.id}
-        renderItem={({ item, index }) => (
+        renderItem={({ item }) => (
           <Card
             style={styles.card}
             onPress={() => navigation.navigate("DetalheProcedimento", { id: item.id })}
@@ -109,7 +109,7 @@ export function ProcedimentosScreen() {
             <Card.Content style={styles.row}>
               <View style={styles.info}>
                 <Text variant="titleSmall">
-                  {`${String(index + 1).padStart(4, "0")}/${dayjs(item.data_procedimento).format("MM")}`}
+                  {formatProcedimentoNumero(item.numero_lancamento ?? 0, item.data_procedimento)}
                 </Text>
                 <Text variant="titleMedium">{item.paciente_nome}</Text>
                 <Text>Anestesista: {item.anestesista_principal_nome}</Text>
