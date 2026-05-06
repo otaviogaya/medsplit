@@ -8,11 +8,12 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { AuthGuard } from "@/src/components/auth-guard";
 import { getErrorMessage } from "@/src/lib/error";
-import { supabase, supabaseConfigError } from "@/src/lib/supabase";
+import { getKeepLoggedIn, setKeepLoggedIn, supabase, supabaseConfigError } from "@/src/lib/supabase";
 
 const schema = z.object({
   email: z.string().email("E-mail inválido"),
   password: z.string().min(6, "Mínimo de 6 caracteres"),
+  keepLoggedIn: z.boolean().optional(),
 });
 
 type FormData = z.infer<typeof schema>;
@@ -25,7 +26,10 @@ export default function LoginPage() {
     register,
     handleSubmit,
     formState: { errors },
-  } = useForm<FormData>({ resolver: zodResolver(schema) });
+  } = useForm<FormData>({
+    resolver: zodResolver(schema),
+    defaultValues: { keepLoggedIn: getKeepLoggedIn() },
+  });
 
   const onSubmit = handleSubmit(async (values) => {
     try {
@@ -35,7 +39,11 @@ export default function LoginPage() {
       }
       setLoading(true);
       setError("");
-      const { error: signInError } = await supabase.auth.signInWithPassword(values);
+      setKeepLoggedIn(values.keepLoggedIn !== false);
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email: values.email,
+        password: values.password,
+      });
       if (signInError) throw signInError;
       router.replace("/procedimentos");
     } catch (err: unknown) {
@@ -90,6 +98,15 @@ export default function LoginPage() {
                 {...register("password")}
               />
               {errors.password && <span className="text-xs text-red-600">{errors.password.message}</span>}
+            </label>
+
+            <label className="mt-1 flex cursor-pointer items-center gap-2 text-sm text-slate-700 select-none">
+              <input
+                className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                type="checkbox"
+                {...register("keepLoggedIn")}
+              />
+              <span>Manter conectado neste dispositivo</span>
             </label>
           </div>
 

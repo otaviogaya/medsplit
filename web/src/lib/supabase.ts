@@ -18,11 +18,54 @@ if (
   console.warn(supabaseConfigError);
 }
 
+const KEEP_LOGGED_KEY = "sb-keep-logged-in";
+
+function getActiveStorage(): Storage | null {
+  if (typeof window === "undefined") return null;
+  const keep = window.localStorage.getItem(KEEP_LOGGED_KEY) !== "0";
+  return keep ? window.localStorage : window.sessionStorage;
+}
+
+const hybridStorage = {
+  getItem: (key: string): string | null => {
+    if (typeof window === "undefined") return null;
+    return window.localStorage.getItem(key) ?? window.sessionStorage.getItem(key);
+  },
+  setItem: (key: string, value: string): void => {
+    if (typeof window === "undefined") return;
+    const active = getActiveStorage();
+    if (!active) return;
+    active.setItem(key, value);
+    const other = active === window.localStorage ? window.sessionStorage : window.localStorage;
+    other.removeItem(key);
+  },
+  removeItem: (key: string): void => {
+    if (typeof window === "undefined") return;
+    window.localStorage.removeItem(key);
+    window.sessionStorage.removeItem(key);
+  },
+};
+
+export function setKeepLoggedIn(keep: boolean): void {
+  if (typeof window === "undefined") return;
+  if (keep) {
+    window.localStorage.removeItem(KEEP_LOGGED_KEY);
+  } else {
+    window.localStorage.setItem(KEEP_LOGGED_KEY, "0");
+  }
+}
+
+export function getKeepLoggedIn(): boolean {
+  if (typeof window === "undefined") return true;
+  return window.localStorage.getItem(KEEP_LOGGED_KEY) !== "0";
+}
+
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
     persistSession: true,
     autoRefreshToken: true,
     detectSessionInUrl: true,
+    storage: hybridStorage,
     lock: async (_name, _acquireTimeout, fn) => await fn(),
   },
 });
