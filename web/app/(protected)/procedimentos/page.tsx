@@ -12,7 +12,7 @@ import {
 } from "@/src/features/cadastros/api";
 import { listProcedimentos } from "@/src/features/procedimentos/api";
 import { SearchableSelect } from "@/src/components/searchable-select";
-import { formatProcedimentoNumero, toDate } from "@/src/lib/format";
+import { formatProcedimentoNumero, toDataHoraAgendamento } from "@/src/lib/format";
 import { pagamentoStatusLabel } from "@/src/lib/status";
 import { ProcedimentoRow } from "@/src/types/rows";
 import { EmptyState } from "@/src/components/empty-state";
@@ -266,7 +266,9 @@ export default function ProcedimentosPage() {
                   <p className="text-xs text-slate-500">{item.descricao_procedimento}</p>
                 )}
                 <p className="text-sm text-slate-600">Anestesista: {item.anestesista_principal_nome}</p>
-                <p className="text-sm text-slate-500">{toDate(item.data_procedimento)}</p>
+                <p className="text-sm text-slate-500">
+                  📅 {toDataHoraAgendamento(item.agendado_inicio ?? null)}
+                </p>
               </div>
               <span
                 className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold text-white ${

@@ -112,7 +112,9 @@ export async function getProcedimentoById(id: string): Promise<ProcedimentoRow |
       id, data_procedimento, paciente_nome, cirurgiao_nome, descricao_procedimento,
       valor_calculado, valor_recebido, valor_glosa, status, pagamento_status,
       forma_pagamento, data_recebimento, documento_foto_url, codigo_cbhpm, porte_anestesico,
-      numero_lancamento,
+      numero_lancamento, hospital_id,
+      agendado_inicio, agendado_fim, agendado_local, agendado_observacoes,
+      feriado, adicional_fim_semana, adicional_noturno,
       hospitais(nome),
       convenios(nome),
       anestesista_principal:anestesistas!anestesista_principal_id(nome)
@@ -151,6 +153,14 @@ export async function getProcedimentoById(id: string): Promise<ProcedimentoRow |
     documento_foto_url: data.documento_foto_url,
     codigo_cbhpm: data.codigo_cbhpm,
     porte_anestesico: data.porte_anestesico,
+    hospital_id: (data as { hospital_id?: string | null }).hospital_id ?? null,
+    agendado_inicio: (data as { agendado_inicio?: string | null }).agendado_inicio ?? null,
+    agendado_fim: (data as { agendado_fim?: string | null }).agendado_fim ?? null,
+    agendado_local: (data as { agendado_local?: string | null }).agendado_local ?? null,
+    agendado_observacoes: (data as { agendado_observacoes?: string | null }).agendado_observacoes ?? null,
+    feriado: (data as { feriado?: boolean }).feriado ?? false,
+    adicional_fim_semana: (data as { adicional_fim_semana?: boolean }).adicional_fim_semana ?? false,
+    adicional_noturno: (data as { adicional_noturno?: boolean }).adicional_noturno ?? false,
   };
 }
 

@@ -10,6 +10,7 @@ type NavLink = { href: string; label: string; icon: string };
 
 const baseLinks: NavLink[] = [
   { href: "/procedimentos", label: "Procedimentos", icon: "📋" },
+  { href: "/agenda", label: "Agenda", icon: "🗓️" },
   { href: "/repasses", label: "Repasses", icon: "💰" },
   { href: "/relatorios", label: "Relatórios", icon: "📈" },
   { href: "/dashboard", label: "Dashboard", icon: "📊" },

@@ -38,4 +38,9 @@ export type ProcedimentoCreatePayload = {
   documento_foto_url?: string | null;
   codigo_cbhpm?: string | null;
   porte_anestesico?: string | null;
+  agendado_inicio?: string | null;
+  agendado_fim?: string | null;
+  agendado_local?: string | null;
+  agendado_observacoes?: string | null;
+  feriado?: boolean;
 };

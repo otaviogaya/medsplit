@@ -2,7 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/src/features/auth/auth-context";
 import {
   getProcedimentoById,
@@ -10,7 +10,22 @@ import {
   updateStatusProcedimento,
   updateValorCalculado,
 } from "@/src/features/procedimentos/api";
-import { toDate, toMoney, todayIsoDate, formatProcedimentoNumero } from "@/src/lib/format";
+import {
+  clearAgendamento,
+  updateAgendamento,
+  type AgendaEvento,
+} from "@/src/features/agenda/api";
+import {
+  downloadIcs,
+  googleCalendarUrl,
+} from "@/src/features/agenda/calendar-export";
+import {
+  toDate,
+  toMoney,
+  todayIsoDate,
+  formatProcedimentoNumero,
+  toDataHoraAgendamento,
+} from "@/src/lib/format";
 import { getErrorMessage } from "@/src/lib/error";
 import { formaPagamentoLabel, pagamentoStatusLabel } from "@/src/lib/status";
 import { FormaPagamentoTipo, ProcedimentoStatus } from "@/src/types/app";
@@ -19,6 +34,8 @@ import { BackLink } from "@/src/components/back-link";
 import { useConfirm } from "@/src/components/confirm-dialog";
 import { useToast } from "@/src/components/toast";
 import { SkeletonList } from "@/src/components/skeleton";
+import { AdicionaisBadges } from "@/src/components/adicionais-badges";
+import { computeAdicionais } from "@/src/lib/adicionais";
 
 function parseValorFinanceiro(input: string): { ok: true; value: number } | { ok: false } {
   const raw = input.trim().replace(",", ".");
@@ -26,6 +43,20 @@ function parseValorFinanceiro(input: string): { ok: true; value: number } | { ok
   const n = Number(raw);
   if (!Number.isFinite(n) || n < 0) return { ok: false };
   return { ok: true, value: n };
+}
+
+/** Converte ISO timestamptz vindo do banco para os valores dos inputs <input type="datetime-local">. */
+function isoToLocalDatetimeInput(iso: string | null) {
+  if (!iso) return "";
+  const d = new Date(iso);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+function localDatetimeInputToDate(value: string): Date | null {
+  if (!value) return null;
+  const d = new Date(value);
+  return Number.isNaN(d.getTime()) ? null : d;
 }
 
 export default function ProcedimentoDetailPage() {
@@ -41,6 +72,14 @@ export default function ProcedimentoDetailPage() {
   const [saving, setSaving] = useState(false);
   const [savingValor, setSavingValor] = useState(false);
   const [error, setError] = useState("");
+
+  const [agendaInicio, setAgendaInicio] = useState("");
+  const [agendaFim, setAgendaFim] = useState("");
+  const [agendaLocal, setAgendaLocal] = useState("");
+  const [agendaObs, setAgendaObs] = useState("");
+  const [agendaFeriado, setAgendaFeriado] = useState(false);
+  const [savingAgenda, setSavingAgenda] = useState(false);
+  const [agendaError, setAgendaError] = useState("");
 
   const { data: procedimento, isLoading } = useQuery<ProcedimentoRow | null>({
     queryKey: ["procedimento-detail", id],
@@ -73,7 +112,91 @@ export default function ProcedimentoDetailPage() {
     setValorCalculado(v != null ? String(v) : "");
     setDataRecebimento(procedimento.data_recebimento ?? todayIsoDate());
     setFormaPagamento(procedimento.forma_pagamento ?? "");
+    setAgendaInicio(isoToLocalDatetimeInput(procedimento.agendado_inicio));
+    setAgendaFim(isoToLocalDatetimeInput(procedimento.agendado_fim));
+    setAgendaLocal(procedimento.agendado_local ?? "");
+    setAgendaObs(procedimento.agendado_observacoes ?? "");
+    setAgendaFeriado(procedimento.feriado ?? false);
   }, [procedimento]);
+
+  const adicionaisPreview = useMemo(() => {
+    return computeAdicionais(localDatetimeInputToDate(agendaInicio), agendaFeriado);
+  }, [agendaInicio, agendaFeriado]);
+
+  const agendamentoEvento: AgendaEvento | null = useMemo(() => {
+    if (!procedimento || !procedimento.agendado_inicio) return null;
+    return {
+      id: procedimento.id,
+      paciente_nome: procedimento.paciente_nome,
+      cirurgiao_nome: procedimento.cirurgiao_nome,
+      hospital_id: procedimento.hospital_id ?? "",
+      hospital_nome: procedimento.hospital_nome,
+      convenio_nome: procedimento.convenio_nome,
+      anestesista_principal_id: "",
+      anestesista_principal_nome: procedimento.anestesista_principal_nome,
+      agendado_inicio: procedimento.agendado_inicio,
+      agendado_fim: procedimento.agendado_fim,
+      agendado_local: procedimento.agendado_local,
+      agendado_observacoes: procedimento.agendado_observacoes,
+      descricao_procedimento: procedimento.descricao_procedimento,
+      codigo_cbhpm: procedimento.codigo_cbhpm,
+      porte_anestesico: procedimento.porte_anestesico,
+      status: procedimento.status,
+      pagamento_status: procedimento.pagamento_status,
+      numero_lancamento: procedimento.numero_lancamento ?? 0,
+      data_procedimento: procedimento.data_procedimento,
+    };
+  }, [procedimento]);
+
+  async function onSalvarAgendamento() {
+    setAgendaError("");
+    const inicio = localDatetimeInputToDate(agendaInicio);
+    if (!inicio) {
+      setAgendaError("Informe o início do agendamento.");
+      return;
+    }
+    const fim = agendaFim ? localDatetimeInputToDate(agendaFim) : null;
+    if (fim && fim.getTime() < inicio.getTime()) {
+      setAgendaError("O horário de fim deve ser posterior ao início.");
+      return;
+    }
+    setSavingAgenda(true);
+    try {
+      await updateAgendamento(id, inicio, fim, agendaLocal, agendaObs, agendaFeriado);
+      toast("Agendamento salvo!");
+      await queryClient.invalidateQueries({ queryKey: ["procedimento-detail", id] });
+      await queryClient.invalidateQueries({ queryKey: ["agenda"] });
+    } catch (err) {
+      setAgendaError(getErrorMessage(err));
+    } finally {
+      setSavingAgenda(false);
+    }
+  }
+
+  async function onLimparAgendamento() {
+    const ok = await confirm({
+      title: "Remover agendamento",
+      message: "Deseja remover o agendamento deste procedimento?",
+      confirmLabel: "Remover",
+    });
+    if (!ok) return;
+    setSavingAgenda(true);
+    try {
+      await clearAgendamento(id);
+      setAgendaInicio("");
+      setAgendaFim("");
+      setAgendaLocal("");
+      setAgendaObs("");
+      setAgendaFeriado(false);
+      toast("Agendamento removido.");
+      await queryClient.invalidateQueries({ queryKey: ["procedimento-detail", id] });
+      await queryClient.invalidateQueries({ queryKey: ["agenda"] });
+    } catch (err) {
+      setAgendaError(getErrorMessage(err));
+    } finally {
+      setSavingAgenda(false);
+    }
+  }
 
   async function onMarcarPago() {
     try {
@@ -218,8 +341,12 @@ export default function ProcedimentoDetailPage() {
             <span className="text-slate-800">{procedimento.convenio_nome}</span>
           </div>
           <div className="grid gap-0.5">
-            <span className="text-xs font-medium uppercase tracking-wide text-slate-400">Data</span>
-            <span className="text-slate-800">{toDate(procedimento.data_procedimento)}</span>
+            <span className="text-xs font-medium uppercase tracking-wide text-slate-400">Data do agendamento</span>
+            <span className="text-slate-800">
+              {procedimento.agendado_inicio
+                ? toDataHoraAgendamento(procedimento.agendado_inicio)
+                : toDate(procedimento.data_procedimento)}
+            </span>
           </div>
           <div className="grid gap-0.5">
             <span className="text-xs font-medium uppercase tracking-wide text-slate-400">Cirurgião</span>
@@ -283,6 +410,141 @@ export default function ProcedimentoDetailPage() {
             <span className="text-slate-500">Forma de pagamento</span>
             <span className="font-semibold text-slate-900">{formaPagamentoLabel(procedimento.forma_pagamento)}</span>
           </div>
+        </div>
+      </div>
+
+      <div className="grid gap-4 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <div>
+            <h2 className="text-lg font-semibold text-slate-900">Agendamento</h2>
+            <p className="text-xs text-slate-500">
+              Defina data, hora e local — aparece automaticamente na <a className="text-blue-700 hover:underline" href="/agenda">aba Agenda</a>.
+            </p>
+          </div>
+          {agendamentoEvento ? (
+            <div className="flex flex-wrap gap-2">
+              <a
+                className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs transition-colors hover:bg-slate-50"
+                href={googleCalendarUrl(agendamentoEvento)}
+                rel="noreferrer"
+                target="_blank"
+              >
+                Google Agenda
+              </a>
+              <button
+                className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs transition-colors hover:bg-slate-50"
+                onClick={() =>
+                  downloadIcs([agendamentoEvento], `${procedimento.paciente_nome}-agendamento.ics`)
+                }
+                type="button"
+              >
+                Baixar .ics
+              </button>
+            </div>
+          ) : null}
+        </div>
+
+        <div className="grid gap-3 sm:grid-cols-2">
+          <label className="grid gap-1 text-sm">
+            <span className="font-medium text-slate-700">Início</span>
+            <input
+              className="rounded-lg border border-slate-300 px-3 py-2.5 text-sm"
+              type="datetime-local"
+              value={agendaInicio}
+              onChange={(e) => setAgendaInicio(e.target.value)}
+            />
+          </label>
+          <label className="grid gap-1 text-sm">
+            <span className="font-medium text-slate-700">Fim (opcional)</span>
+            <input
+              className="rounded-lg border border-slate-300 px-3 py-2.5 text-sm"
+              type="datetime-local"
+              value={agendaFim}
+              onChange={(e) => setAgendaFim(e.target.value)}
+            />
+          </label>
+        </div>
+
+        <label className="grid gap-1 text-sm">
+          <span className="font-medium text-slate-700">Local (opcional)</span>
+          <input
+            className="rounded-lg border border-slate-300 px-3 py-2.5 text-sm"
+            value={agendaLocal}
+            onChange={(e) => setAgendaLocal(e.target.value)}
+            placeholder="Ex.: Sala 3 — bloco cirúrgico"
+          />
+        </label>
+
+        <label className="grid gap-1 text-sm">
+          <span className="font-medium text-slate-700">Observações (opcional)</span>
+          <textarea
+            className="rounded-lg border border-slate-300 px-3 py-2.5 text-sm"
+            rows={2}
+            value={agendaObs}
+            onChange={(e) => setAgendaObs(e.target.value)}
+            placeholder="Preparo, equipamento especial, etc."
+          />
+        </label>
+
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+          <label className="flex cursor-pointer items-center gap-2 text-sm text-slate-700">
+            <input
+              type="checkbox"
+              className="h-4 w-4 rounded border-slate-300"
+              checked={agendaFeriado}
+              onChange={(e) => setAgendaFeriado(e.target.checked)}
+            />
+            <span className="font-medium">É feriado?</span>
+            <span className="text-xs text-slate-500">(marca o adicional de fim de semana)</span>
+          </label>
+          {adicionaisPreview.fimDeSemana || adicionaisPreview.noturno ? (
+            <AdicionaisBadges
+              fimDeSemana={adicionaisPreview.fimDeSemana}
+              noturno={adicionaisPreview.noturno}
+              size="sm"
+            />
+          ) : (
+            <span className="text-xs text-slate-500">Sem adicionais para esta data e horário.</span>
+          )}
+        </div>
+
+        {(procedimento.adicional_fim_semana || procedimento.adicional_noturno) ? (
+          <div className="rounded-lg border border-blue-100 bg-blue-50 px-3 py-2 text-xs text-blue-900">
+            <p className="font-medium">Adicionais aplicados a este procedimento:</p>
+            <AdicionaisBadges
+              fimDeSemana={procedimento.adicional_fim_semana}
+              noturno={procedimento.adicional_noturno}
+              size="sm"
+              className="mt-1"
+            />
+          </div>
+        ) : null}
+
+        {agendaError ? (
+          <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+            {agendaError}
+          </div>
+        ) : null}
+
+        <div className="flex flex-wrap gap-2">
+          <button
+            className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:opacity-60"
+            disabled={savingAgenda}
+            onClick={onSalvarAgendamento}
+            type="button"
+          >
+            {savingAgenda ? "Salvando..." : agendamentoEvento ? "Atualizar agendamento" : "Salvar agendamento"}
+          </button>
+          {agendamentoEvento ? (
+            <button
+              className="rounded-lg border border-slate-300 px-4 py-2 text-sm text-slate-600 transition-colors hover:bg-slate-50 disabled:opacity-60"
+              disabled={savingAgenda}
+              onClick={onLimparAgendamento}
+              type="button"
+            >
+              Remover agendamento
+            </button>
+          ) : null}
         </div>
       </div>
 

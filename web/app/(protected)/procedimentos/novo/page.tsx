@@ -29,15 +29,36 @@ import { todayIsoDate } from "@/src/lib/format";
 import { getErrorMessage } from "@/src/lib/error";
 import { BackLink } from "@/src/components/back-link";
 import { useToast } from "@/src/components/toast";
+import { TimePicker } from "@/src/components/time-picker";
+import { AdicionaisBadges } from "@/src/components/adicionais-badges";
+import { computeAdicionais } from "@/src/lib/adicionais";
 
-const schema = z.object({
-  data_procedimento: z.string().min(10, "Informe a data"),
-  hospital_id: z.string().uuid("Selecione um hospital"),
-  paciente_nome: z.string().min(2, "Nome do paciente obrigatório"),
-  valor: z.string().optional(),
-  anestesista_principal_id: z.string().uuid("Selecione um anestesista"),
-  observacoes: z.string().optional(),
-});
+const schema = z
+  .object({
+    data_procedimento: z.string().min(10, "Informe a data"),
+    horario_inicio: z
+      .string()
+      .regex(/^\d{2}:\d{2}$/, "Informe o horário de início"),
+    horario_fim: z
+      .string()
+      .optional()
+      .refine((v) => !v || /^\d{2}:\d{2}$/.test(v), {
+        message: "Horário inválido",
+      }),
+    hospital_id: z.string().uuid("Selecione um hospital"),
+    paciente_nome: z.string().min(2, "Nome do paciente obrigatório"),
+    valor: z.string().optional(),
+    anestesista_principal_id: z.string().uuid("Selecione um anestesista"),
+    observacoes: z.string().optional(),
+    feriado: z.boolean().optional(),
+  })
+  .refine(
+    (data) => {
+      if (!data.horario_fim) return true;
+      return data.horario_fim > data.horario_inicio;
+    },
+    { message: "O fim deve ser posterior ao início", path: ["horario_fim"] },
+  );
 
 type FormData = z.infer<typeof schema>;
 
@@ -127,16 +148,33 @@ export default function NovoProcedimentoPage() {
     register,
     handleSubmit,
     setValue,
+    watch,
     formState: { errors },
   } = useForm<FormData>({
     resolver: zodResolver(schema),
     defaultValues: {
       data_procedimento: todayIsoDate(),
+      horario_inicio: "08:00",
+      horario_fim: "",
       paciente_nome: "",
       valor: "",
       observacoes: "",
+      feriado: false,
     },
   });
+
+  const horarioInicio = watch("horario_inicio") ?? "";
+  const horarioFim = watch("horario_fim") ?? "";
+  const dataProc = watch("data_procedimento") ?? "";
+  const feriadoVal = watch("feriado") ?? false;
+
+  const adicionaisPreview = useMemo(() => {
+    if (!dataProc || !horarioInicio || !/^\d{2}:\d{2}$/.test(horarioInicio)) {
+      return computeAdicionais(null, feriadoVal);
+    }
+    const dt = new Date(`${dataProc}T${horarioInicio}:00`);
+    return computeAdicionais(dt, feriadoVal);
+  }, [dataProc, horarioInicio, feriadoVal]);
 
   const { data: hospitais = [] } = useQuery({ queryKey: ["hospitais"], queryFn: listHospitais });
   const { data: convenios = [] } = useQuery({ queryKey: ["convenios"], queryFn: listConvenios });
@@ -212,6 +250,11 @@ export default function NovoProcedimentoPage() {
       const cbhpm = buildCbhpmPayload(cbhpmList);
       const valorNum = Number((values.valor ?? "0").replace(",", ".")) || 0;
 
+      const inicioLocal = new Date(`${values.data_procedimento}T${values.horario_inicio}:00`);
+      const fimLocal = values.horario_fim
+        ? new Date(`${values.data_procedimento}T${values.horario_fim}:00`)
+        : null;
+
       await createProcedimento({
         data_procedimento: values.data_procedimento,
         hospital_id: values.hospital_id,
@@ -226,7 +269,11 @@ export default function NovoProcedimentoPage() {
         documento_foto_url: documentoUrlFinal,
         codigo_cbhpm: cbhpm.codigos,
         porte_anestesico: cbhpm.porteAnestesico,
+        agendado_inicio: inicioLocal.toISOString(),
+        agendado_fim: fimLocal ? fimLocal.toISOString() : null,
+        feriado: !!values.feriado,
       });
+      await queryClient.invalidateQueries({ queryKey: ["agenda"] });
       await queryClient.invalidateQueries({ queryKey: ["procedimentos"] });
       toast("Procedimento criado com sucesso!");
       router.push("/procedimentos");
@@ -244,12 +291,59 @@ export default function NovoProcedimentoPage() {
       <form className="grid max-w-3xl gap-4 rounded-xl border border-slate-200 bg-white p-6 shadow-sm" onSubmit={onSubmit}>
         <h1 className="text-xl font-semibold text-slate-900">Novo procedimento</h1>
 
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid gap-4 sm:grid-cols-3">
           <label className="grid gap-1 text-sm">
-            <span className="font-medium text-slate-700">Data do procedimento</span>
+            <span className="font-medium text-slate-700">Data</span>
             <input className={errors.data_procedimento ? inputErrorClass : inputClass} type="date" {...register("data_procedimento")} />
             {errors.data_procedimento && <span className="text-xs text-red-600">{errors.data_procedimento.message}</span>}
           </label>
+          <div className="grid gap-1 text-sm">
+            <span className="font-medium text-slate-700">
+              Início <span className="text-red-500">*</span>
+            </span>
+            <input type="hidden" {...register("horario_inicio")} />
+            <TimePicker
+              value={horarioInicio}
+              onChange={(v) => setValue("horario_inicio", v, { shouldValidate: true })}
+              hasError={!!errors.horario_inicio}
+              required
+            />
+            {errors.horario_inicio && (
+              <span className="text-xs text-red-600">{errors.horario_inicio.message}</span>
+            )}
+          </div>
+          <div className="grid gap-1 text-sm">
+            <span className="font-medium text-slate-700">Fim (opcional)</span>
+            <input type="hidden" {...register("horario_fim")} />
+            <TimePicker
+              value={horarioFim}
+              onChange={(v) => setValue("horario_fim", v, { shouldValidate: true })}
+              hasError={!!errors.horario_fim}
+            />
+            {errors.horario_fim && (
+              <span className="text-xs text-red-600">{errors.horario_fim.message}</span>
+            )}
+          </div>
+        </div>
+
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+          <label className="flex cursor-pointer items-center gap-2 text-sm text-slate-700">
+            <input type="checkbox" className="h-4 w-4 rounded border-slate-300" {...register("feriado")} />
+            <span className="font-medium">É feriado?</span>
+            <span className="text-xs text-slate-500">(marca o adicional de fim de semana)</span>
+          </label>
+          {adicionaisPreview.fimDeSemana || adicionaisPreview.noturno ? (
+            <AdicionaisBadges
+              fimDeSemana={adicionaisPreview.fimDeSemana}
+              noturno={adicionaisPreview.noturno}
+              size="sm"
+            />
+          ) : (
+            <span className="text-xs text-slate-500">Sem adicionais para esta data e horário.</span>
+          )}
+        </div>
+
+        <div className="grid gap-4">
           <label className="grid gap-1 text-sm">
             <span className="font-medium text-slate-700">Hospital</span>
             <select className={errors.hospital_id ? inputErrorClass : inputClass} {...register("hospital_id")}>

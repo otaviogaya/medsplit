@@ -32,3 +32,26 @@ export function formatProcedimentoNumero(numeroLancamento: number, dataProcedime
   const yyyy = String(d.getFullYear());
   return `${String(numeroLancamento).padStart(4, "0")}/${mm}-${yyyy}`;
 }
+
+/**
+ * Data exibida no card do procedimento: prioriza `agendado_inicio`
+ * (data do agendamento) e, se ausente, cai para `data_procedimento`.
+ */
+export function toDataAgendamento(
+  agendadoInicio?: string | null,
+  dataProcedimento?: string | null,
+) {
+  if (agendadoInicio) {
+    return dateFormatter.format(new Date(agendadoInicio));
+  }
+  return toDate(dataProcedimento);
+}
+
+/** Ex.: "06/05/2026 às 08:00" para exibição em destaque. */
+export function toDataHoraAgendamento(agendadoInicio?: string | null) {
+  if (!agendadoInicio) return "-";
+  const d = new Date(agendadoInicio);
+  const hh = String(d.getHours()).padStart(2, "0");
+  const mm = String(d.getMinutes()).padStart(2, "0");
+  return `${dateFormatter.format(d)} às ${hh}:${mm}`;
+}

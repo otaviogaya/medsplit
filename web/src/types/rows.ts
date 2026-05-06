@@ -21,6 +21,14 @@ export type ProcedimentoRow = {
   documento_foto_url: string | null;
   codigo_cbhpm: string | null;
   porte_anestesico: string | null;
+  hospital_id: string | null;
+  agendado_inicio: string | null;
+  agendado_fim: string | null;
+  agendado_local: string | null;
+  agendado_observacoes: string | null;
+  feriado: boolean;
+  adicional_fim_semana: boolean;
+  adicional_noturno: boolean;
 };
 
 export type RepasseRow = {
