@@ -9,6 +9,7 @@ type AuthContextType = {
   session: Session | null;
   loading: boolean;
   role: UserRole | null;
+  nome: string | null;
   equipeId: string | null;
   equipeNome: string | null;
   configError: string | null;
@@ -19,6 +20,7 @@ const AuthContext = createContext<AuthContextType>({
   session: null,
   loading: true,
   role: null,
+  nome: null,
   equipeId: null,
   equipeNome: null,
   configError: null,
@@ -28,6 +30,7 @@ const AuthContext = createContext<AuthContextType>({
 export function AuthProvider({ children }: PropsWithChildren) {
   const [session, setSession] = useState<Session | null>(null);
   const [role, setRole] = useState<UserRole | null>(null);
+  const [nome, setNome] = useState<string | null>(null);
   const [equipeId, setEquipeId] = useState<string | null>(null);
   const [equipeNome, setEquipeNome] = useState<string | null>(null);
   const [loading, setLoading] = useState(!supabaseConfigError);
@@ -43,14 +46,16 @@ export function AuthProvider({ children }: PropsWithChildren) {
 
       const { data: profile } = await supabase
         .from("users_profile")
-        .select("role, equipe_id")
+        .select("role, equipe_id, nome")
         .eq("id", userId)
         .maybeSingle();
 
       const userRole = (profile?.role as UserRole | undefined) ?? null;
       const eqId = profile?.equipe_id as string | null;
+      const userNome = (profile?.nome as string | undefined) ?? null;
       setRole(userRole);
       setEquipeId(eqId);
+      setNome(userNome);
 
       if (eqId) {
         supabase
@@ -82,6 +87,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
       } else {
         profileLoadedForUser = null;
         setRole(null);
+        setNome(null);
         setEquipeId(null);
         setEquipeNome(null);
       }
@@ -95,6 +101,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
       value={{
         session,
         role,
+        nome,
         equipeId,
         equipeNome,
         loading,

@@ -28,7 +28,7 @@ const roleLabel: Record<string, string> = {
 export function AppShell({ children }: PropsWithChildren) {
   const pathname = usePathname();
   const router = useRouter();
-  const { signOut, role, equipeNome } = useAuth();
+  const { signOut, role, nome, equipeNome } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
 
@@ -83,10 +83,15 @@ export function AppShell({ children }: PropsWithChildren) {
             </Link>
           </div>
           <div className="flex items-center gap-2">
-            {equipeNome ? (
-              <span className="hidden rounded-full bg-blue-50 px-3 py-1 text-xs font-medium text-blue-700 sm:block">
-                {equipeNome}
-              </span>
+            {(nome || equipeNome) ? (
+              <div className="hidden flex-col items-end leading-tight sm:flex">
+                {nome ? (
+                  <span className="text-sm font-semibold text-slate-800">{nome}</span>
+                ) : null}
+                {equipeNome ? (
+                  <span className="text-xs text-slate-500">{equipeNome}</span>
+                ) : null}
+              </div>
             ) : null}
             <span className="hidden rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600 sm:block">
               {roleLabel[role ?? ""] ?? role ?? "-"}
